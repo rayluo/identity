@@ -1,17 +1,30 @@
-# python-project-template
-A minimalist template to start a new Python project.
+# Identity library
+
+This is an authentication/authorization library, currently optimized for web apps.
+It provides some higher level APIs built on top of
+[Microsoft's MSAL Python](https://github.com/AzureAD/microsoft-authentication-library-for-python).
+
+## Scenarios supported
+
+* Web app that signs in users
+* Web app that signs in users and calls a web API on their behalf
+* Protected web API that only authenticated users can access (Partial support)
+* [In roadmap] Protected web API that calls another (downstream) web API on behalf of the signed-in user
+
+## Installation
+
+TBD
+
+
+## Versions
+
+This library follows [Semantic Versioning](http://semver.org/).
+
+You can find the changes for each version under
+[Releases](https://github.com/rayluo/identity/releases).
 
 
 ## Usage
 
-1. From github web interface,
-   [use this repo as a template](https://github.com/rayluo/python-project-template/generate)
-   to start your new project, then you can clone your project into your local machine.
-2. `git mv my_package your_prj_name`
-   (By the way, if you need inspiration on deciding your project name,
-   read [this](https://www.python.org/dev/peps/pep-0423/#use-a-single-name).)
-3. Modify `setup.cfg` and this `README.md`, possibly also `LICENSE`.
-4. Commit your change. You are now ready to work on YOUR project!
-5. Optionally, rename `your_prj_name/main_module.py` into your preferred module name.
-   If you do so, do not forget to also modify `your_prj_name/__init__.py` accordingly.
+Sample coming soon.
 
