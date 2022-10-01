@@ -65,7 +65,7 @@ By using this library, it will automatically renew signed-in session when the ID
 * [Sample written in ![Flask](https://raw.githubusercontent.com/rayluo/identity/dev/docs/flask.webp)](https://github.com/Azure-Samples/ms-identity-python-webapp)
 * [Sample written in ![Quart](https://raw.githubusercontent.com/rayluo/identity/dev/docs/quart.webp)](https://github.com/rayluo/python-webapp-quart)
 * Need support for more web frameworks?
-  [Upvote existing feature request or create a new one](https://github.com/rayluo/identity/issues)
+  [Upvote existing feature request or create a new one](https://github.com/rayluo/identity/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc)
 
 </td>
   </tr>
@@ -119,8 +119,7 @@ Read our [docs here](https://identity-library.readthedocs.io/en/latest/)
     <th>Other scenarios</th>
     <td colspan=4>
 
-[Upvote existing feature request or create a new one](https://github.com/rayluo/identity/issues)
-<!-- FastAPI, Streamlit, ... -->
+[Upvote existing feature request or create a new one](https://github.com/rayluo/identity/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc)
 
 </td>
   </tr>
