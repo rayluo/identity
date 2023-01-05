@@ -7,11 +7,11 @@ import msal
 logger = logging.getLogger(__name__)
 
 
-class Web(object):
+class Auth(object):
     # These key names are hopefully unique in session
     _TOKEN_CACHE = "_token_cache"
     _AUTH_FLOW = "_auth_flow"
-    _USER = "_signed_in_user"
+    _USER = "_logged_in_user"
     def __init__(
             self,
             *,
@@ -19,7 +19,6 @@ class Web(object):
             authority,
             client_id,
             client_credential=None,  # TODO: TBD
-            redirect_uri=None,
             validators=None,
             ):
         """Create an identity helper for a web app.
@@ -42,11 +41,6 @@ class Web(object):
             It is somtimes a string.
             The actual format is decided by the underlying auth library. TBD.
 
-        :param str redirect_uri:
-            An absolute uri you registered for your web app.
-            In Flask, if your redirect_uri function is named ``def auth_redirect()``,
-            then you can use ``url_for("auth_redirect", _external=True)``.
-
         :param list validators:
             It defines a list of validators which will be automatically triggered
             each time you call ``get_user()`` or ``get_token()``.
@@ -67,7 +61,6 @@ class Web(object):
         self._authority = authority
         self._client_id = client_id
         self._client_credential = client_credential
-        self._redirect_uri = redirect_uri
         self._validators = validators if validators else []
         self._http_cache = {}  # All subsequent MSAL instances will share this
 
@@ -98,14 +91,28 @@ class Web(object):
             v(id_token_claims) for v in (validators or self._validators)
             ) else None
 
-    def start_auth(self, scopes=None, **kwargs):
-        """Returns a dict containing the auth_uri that you need to guide end user to visit.
+    def log_in(self, scopes=None, redirect_uri=None, **kwargs):
+        """This is the first leg of the authentication/authorization.
+
+        :param str redirect_uri:
+            Optional.
+            If present, it must be an absolute uri you registered for your web app.
+            In Flask, if your redirect_uri function is named ``def auth_redirect()``,
+            then you can use ``url_for("auth_redirect", _external=True)``.
+
+            Optional. If absent, your end users will log in to your web app
+            using a different method named Device Code Flow.
+            It is less convenient for end user, but still works.
+
+        Returns a dict containing the ``auth_uri`` that you need to guide end user to visit.
+        If your app has no redirect uri, this method will also return a ``user_code``
+        which you shall also display to end user for them to use during log-in.
         """
         _scopes = scopes or []
-        app = self._build_msal_app()  # Note: This would be a PCA
-        if self._redirect_uri:
+        app = self._build_msal_app()  # Note: This could be a PCA
+        if redirect_uri:
             flow = app.initiate_auth_code_flow(
-                _scopes, redirect_uri=self._redirect_uri, **kwargs)
+                _scopes, redirect_uri=redirect_uri, **kwargs)
             self._session[self._AUTH_FLOW] = flow
             return {
                 "auth_uri": self._session[self._AUTH_FLOW]["auth_uri"],
@@ -118,7 +125,7 @@ class Web(object):
                 "user_code": flow["user_code"],
                 }
 
-    def complete_auth(self, auth_response=None):
+    def complete_log_in(self, auth_response=None):
         """This is the second leg of the authentication/authorization.
 
         It is used inside your redirect_uri controller.
@@ -127,14 +134,17 @@ class Web(object):
             A dict-like object containing the parameters issued by Identity Provider.
             If you are using Flask, you can pass in ``request.args``.
             If you are using Django, you can pass in ``HttpRequest.GET``.
+
+            If you were using Device Code Flow, you won't have an auth response,
+            in that case you can leave it with its default value ``None``.
         :return:
             * On failure, a dict containing "error" and optional "error_description",
               for you to somehow render it to end user.
-            * On success, a dict containing the info of current signed-in user.
+            * On success, a dict containing the info of current logged-in user.
               That dict is actually the claims from an already-validated ID token.
         """
         cache = self._load_cache()
-        if self._redirect_uri:
+        if auth_response:  # Auth Code flow
             try:
                 result = self._build_msal_app(
                     client_credential=self._client_credential,
@@ -143,26 +153,26 @@ class Web(object):
                         self._session.get(self._AUTH_FLOW, {}), auth_response)
             except ValueError as e:  # Usually caused by CSRF
                 return {"error": "invalid_grant", "error_description": str(e)}
-        else:
+        else:  # Device Code flow
             result = self._build_msal_app(cache=cache).acquire_token_by_device_flow(
                 self._session.get(self._AUTH_FLOW, {}),
-                exit_condition = lambda flow: True,
+                exit_condition=lambda flow: True,
                 )
         if "error" in result:
             return result
-        # TODO: Reject a re-sign-in with a different account?
+        # TODO: Reject a re-log-in with a different account?
         self._session[self._USER] = result["id_token_claims"]
         self._save_cache(cache)
         self._session.pop(self._AUTH_FLOW, None)
         return self._get_user()  # This triggers validation
 
     def get_user(self, validators=None):
-        """Returns None if the user has not signed in or no longer passes validation.
-        Otherwise returns a dict representing the current signed-in user.
+        """Returns None if the user has not logged in or no longer passes validation.
+        Otherwise returns a dict representing the current logged-in user.
 
         The dict will have following keys:
 
-        * sub. It is the unique identifier of the current signed-in user.
+        * sub. It is the unique identifier of the current logged-in user.
           You can use it to create an entry in your web app's local database.
         * Some of `other claims <https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims>`_
         """
@@ -175,21 +185,23 @@ class Web(object):
         app = self._build_msal_app(
             client_credential=self._client_credential, cache=cache)
         accounts = app.get_accounts()
-        if accounts:  # TODO: Consider all account(s) belong to the current signed-in user
+        if accounts:  # TODO: Consider all account(s) belong to the current logged-in user
             result = app.acquire_token_silent(scopes, account=accounts[0], **kwargs)
             self._save_cache(cache)  # Cache might be refreshed. Save it.
             return result
 
-    def sign_out(self, homepage):
-        """Signs out the user from current app.
+    def log_out(self, homepage):
+        # The vocabulary is "log out" (rather than "sign out") in the specs
+        # https://openid.net/specs/openid-connect-frontchannel-1_0.html
+        """Logs out the user from current app.
 
         :param str homepage:
-            The page to be redirected to, after the sign-out.
+            The page to be redirected to, after the log-out.
             In Flask, you can pass in ``url_for("index", _external=True)``.
 
         :return:
-            An upstream sign-out URL. You can optionally guide user to visit it,
-            otherwise the user remains signed-in there, and SSO back to your app.
+            An upstream log-out URL. You can optionally guide user to visit it,
+            otherwise the user remains logged-in there, and can SSO back to your app.
         """
         self._session.pop(self._USER, None)  # Must
         self._session.pop(self._TOKEN_CACHE, None)  # Optional
@@ -222,14 +234,14 @@ class Validator(object):
 
 class LifespanValidator(Validator):
     def __init__(self, *, seconds=None, skew=None, **kwargs):
-        """This validator let signed-in session expire after a certain time.
+        """This validator let logged-in session expire after a certain time.
 
-        Without this validator, Identity Web library will keep user signed-in
-        until they explicitly sign out.
+        Without this validator, Identity Web library will keep user logged-in
+        until they explicitly log out.
 
         :param int seconds:
-            Specify the lifespan of the current signed-in session.
-            The default value is None, which means the signed-in session will
+            Specify the lifespan of the current logged-in session.
+            The default value is None, which means the logged-in session will
             have same expiry time as the ID token, which is around 1 hour.
         """
         self._seconds = seconds
