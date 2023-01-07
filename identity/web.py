@@ -19,7 +19,6 @@ class Auth(object):
             authority,
             client_id,
             client_credential=None,  # TODO: TBD
-            validators=None,
             ):
         """Create an identity helper for a web app.
 
@@ -40,28 +39,11 @@ class Auth(object):
         :param str client_credential:
             It is somtimes a string.
             The actual format is decided by the underlying auth library. TBD.
-
-        :param list validators:
-            It defines a list of validators which will be automatically triggered
-            each time you call ``get_user()`` or ``get_token()``.
-
-            A simpliest validator is just a callable returning a boolean:
-
-                def is_valid(id_token_claims):
-                    # This app will only allow John Doe to log in
-                    return id_token_claims.get("preferred_username") == "johndoe"
-
-            The reason of a failed validation is not explicitly defined here,
-            but you can raise your own exceptions and catch them by yourself.
-
-            There are more sophisticated predefined validators which allows you
-            to customize what exception to raise.
         """
         self._session = session
         self._authority = authority
         self._client_id = client_id
         self._client_credential = client_credential
-        self._validators = validators if validators else []
         self._http_cache = {}  # All subsequent MSAL instances will share this
 
     def _load_cache(self):
@@ -85,11 +67,10 @@ class Auth(object):
             http_cache=self._http_cache,  # Share same http_cache among MSAL instances
             )
 
-    def _get_user(self, validators=None):
+    def _get_user(self):
         id_token_claims = self._session.get(self._USER)
-        return id_token_claims if id_token_claims is not None and all(
-            v(id_token_claims) for v in (validators or self._validators)
-            ) else None
+        return id_token_claims if id_token_claims is not None and _is_valid(
+            id_token_claims) else None
 
     def log_in(self, scopes=None, redirect_uri=None, **kwargs):
         """This is the first leg of the authentication/authorization.
@@ -166,20 +147,28 @@ class Auth(object):
         self._session.pop(self._AUTH_FLOW, None)
         return self._get_user()  # This triggers validation
 
-    def get_user(self, validators=None):
+    def get_user(self):
         """Returns None if the user has not logged in or no longer passes validation.
         Otherwise returns a dict representing the current logged-in user.
 
         The dict will have following keys:
 
-        * sub. It is the unique identifier of the current logged-in user.
+        * ``sub``. It is the unique identifier of the current logged-in user.
           You can use it to create an entry in your web app's local database.
         * Some of `other claims <https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims>`_
         """
-        return self._get_user(validators=validators)
+        return self._get_user()
 
-    def get_token(self, scopes=None, validators=None, **kwargs):
-        if not self._get_user(validators=validators):  # Validate current session first
+    def get_token(self, scopes=None, **kwargs):
+        """Returns None if the user has not logged in or no longer passes validation.
+        Otherwise returns a dict representing the token and its metadata.
+
+        The dict will have following keys:
+
+        * ``access_token``. It is the access token for accessing the resource.
+        * Some of `other claims <https://www.rfc-editor.org/rfc/rfc6749#section-5.1>`_
+        """
+        if not self._get_user():  # Validate current session first
             return
         cache = self._load_cache()  # This web app maintains one cache per session
         app = self._build_msal_app(
@@ -209,49 +198,13 @@ class Auth(object):
             authority=self._authority, hp=homepage)
 
 
-class Validator(object):
-    def __init__(self, *, on_error=None):
-        """This base class of Validator allows to raise customized exception.
-
-        :param Exception on_error:
-            It can be an exception class or an instance of an exception.
-        """
-        self._on_error = on_error
-
-    def is_valid(self, id_token_claims):
-        """Sub-class should return True of False"""
-        raise NotImplementedError()
-
-    def __call__(self, id_token_claims):
-        is_valid = self.is_valid(id_token_claims)
-        if self._on_error is not None and not is_valid:
-            if isinstance(self._on_error, Exception):
-                raise self._on_error
-            elif issubclass(self._on_error, Exception):
-                raise self._on_error(id_token_claims)
-        return is_valid
-
-
-class LifespanValidator(Validator):
-    def __init__(self, *, seconds=None, skew=None, **kwargs):
-        """This validator let logged-in session expire after a certain time.
-
-        Without this validator, Identity Web library will keep user logged-in
-        until they explicitly log out.
-
-        :param int seconds:
-            Specify the lifespan of the current logged-in session.
-            The default value is None, which means the logged-in session will
-            have same expiry time as the ID token, which is around 1 hour.
-        """
-        self._seconds = seconds
-        self._skew = 210 if skew is None else skew
-        super(LifespanValidator, self).__init__(**kwargs)
-
-    def is_valid(self, id_token_claims):
-        now = time.time()
-        logger.debug("now=%s, iat=%s, skew=%s", now, id_token_claims["iat"], self._skew)
-        return now < self._skew + (
-            id_token_claims["exp"] if self._seconds is None
-            else id_token_claims["iat"] + self._seconds)
+def _is_valid(id_token_claims, skew=None, seconds=None):
+    # This is an internal helper.
+    # But the customer could implement their own helper to wrap on top of get_user().
+    skew = 210 if skew is None else skew
+    now = time.time()
+    logger.debug("now=%s, iat=%s, skew=%s", now, id_token_claims["iat"], skew)
+    return now < skew + (
+        id_token_claims["exp"] if seconds is None
+        else id_token_claims["iat"] + seconds)
 
