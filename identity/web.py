@@ -34,7 +34,7 @@ class Auth(object):
             For example, ``https://example.com/foo``.
 
         :param str client_id:
-            The client_id of your web app, issued by its autority.
+            The client_id of your web app, issued by its authority.
 
         :param str client_credential:
             It is somtimes a string.
@@ -75,13 +75,16 @@ class Auth(object):
     def log_in(self, scopes=None, redirect_uri=None, **kwargs):
         """This is the first leg of the authentication/authorization.
 
+        :param list scopes:
+            A list of scopes that your app will need to use.
+
         :param str redirect_uri:
             Optional.
             If present, it must be an absolute uri you registered for your web app.
-            In Flask, if your redirect_uri function is named ``def auth_redirect()``,
-            then you can use ``url_for("auth_redirect", _external=True)``.
+            In Flask, if your redirect_uri function is named ``def auth_response()``,
+            then you can use ``url_for("auth_response", _external=True)``.
 
-            Optional. If absent, your end users will log in to your web app
+            If absent, your end users will log in to your web app
             using a different method named Device Code Flow.
             It is less convenient for end user, but still works.
 
@@ -159,8 +162,13 @@ class Auth(object):
         """
         return self._get_user()
 
-    def get_token(self, scopes=None, **kwargs):
-        """Returns None if the user has not logged in or no longer passes validation.
+    def get_token(self, scopes, **kwargs):
+        """Get access token for the specified scopes.
+
+        :param list scopes:
+            A list of scopes that your app will need to use.
+
+        Returns None if the user has not logged in or no longer passes validation.
         Otherwise returns a dict representing the token and its metadata.
 
         The dict will have following keys:
