@@ -64,8 +64,8 @@ Web app that logs in users and calls a web API on their behalf
 --------------------------------------------------------------
 
 Building on top of the previous scenario, you just need to call
-``auth.get_token(["your_scope"])`` to obtain a token object.
-See :py:meth:`.get_token` for more details.
+``auth.get_token_for_user(["your_scope"])`` to obtain a token object.
+See :py:meth:`.get_token_for_user` for more details.
 And you can see it in action in this sample (link to be provided).
 
 
