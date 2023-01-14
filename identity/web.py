@@ -93,7 +93,7 @@ class Auth(object):
         which you shall also display to end user for them to use during log-in.
         """
         _scopes = scopes or []
-        app = self._build_msal_app()  # Note: This could be a PCA
+        app = self._build_msal_app()  # Only need a PCA at this moment
         if redirect_uri:
             flow = app.initiate_auth_code_flow(
                 _scopes, redirect_uri=redirect_uri, **kwargs)
@@ -162,30 +162,32 @@ class Auth(object):
         """
         return self._get_user()
 
-    def get_token(self, scopes, **kwargs):
-        """Get access token for the specified scopes.
+    def get_token_for_user(self, scopes, **kwargs):
+        """Get access token for the current user, with specified scopes.
 
         :param list scopes:
             A list of scopes that your app will need to use.
 
-        Returns None if the user has not logged in or no longer passes validation.
-        Otherwise returns a dict representing the token and its metadata.
+        :return: A dict representing the json response from identity provider.
 
-        The dict will have following keys:
+            - A successful response would contain "access_token" key,
+            - An error response would contain "error" and usually "error_description".
 
-        * ``access_token``. It is the access token for accessing the resource.
-        * Some of `other claims <https://www.rfc-editor.org/rfc/rfc6749#section-5.1>`_
+            See also `OAuth2 specs <https://www.rfc-editor.org/rfc/rfc6749#section-5>`_.
         """
+        error_response = {"error": "interaction_required", "error_description": "User need to log in and/or consent"}
         if not self._get_user():  # Validate current session first
-            return
+            return {"error": "interaction_required", "error_description": "Log in required"}
         cache = self._load_cache()  # This web app maintains one cache per session
         app = self._build_msal_app(
             client_credential=self._client_credential, cache=cache)
         accounts = app.get_accounts()
         if accounts:  # TODO: Consider all account(s) belong to the current logged-in user
-            result = app.acquire_token_silent(scopes, account=accounts[0], **kwargs)
+            result = app.acquire_token_silent_with_error(scopes, account=accounts[0])
             self._save_cache(cache)  # Cache might be refreshed. Save it.
-            return result
+            if result:
+                return result
+        return {"error": "interaction_required", "error_description": "Cache missed"}
 
     def log_out(self, homepage):
         # The vocabulary is "log out" (rather than "sign out") in the specs
@@ -204,6 +206,26 @@ class Auth(object):
         self._session.pop(self._TOKEN_CACHE, None)  # Optional
         return "{authority}/oauth2/v2.0/logout?post_logout_redirect_uri={hp}".format(
             authority=self._authority, hp=homepage)
+
+    def get_token_for_client(self, scopes):
+        """Get access token for the current app, with specified scopes.
+
+        :param list scopes:
+            A list of scopes that your app will need to use.
+
+        :return: A dict representing the json response from identity provider.
+
+            - A successful response would contain "access_token" key,
+            - An error response would contain "error" and usually "error_description".
+
+            See also `OAuth2 specs <https://www.rfc-editor.org/rfc/rfc6749#section-5>`_.
+        """
+        # TODO: Where shall token cache come from?
+        app = self._build_msal_app(client_credential=self._client_credential)
+        result = app.acquire_token_silent(scopes, account=None)
+        return result if (
+            result and "access_token" in result
+            ) else app.acquire_token_for_client(scopes)
 
 
 def _is_valid(id_token_claims, skew=None, seconds=None):
