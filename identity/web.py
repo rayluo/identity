@@ -18,7 +18,7 @@ class Auth(object):
             session,
             authority,
             client_id,
-            client_credential=None,  # TODO: TBD
+            client_credential=None,
             ):
         """Create an identity helper for a web app.
 
@@ -176,13 +176,14 @@ class Auth(object):
             See also `OAuth2 specs <https://www.rfc-editor.org/rfc/rfc6749#section-5>`_.
         """
         error_response = {"error": "interaction_required", "error_description": "User need to log in and/or consent"}
-        if not self._get_user():  # Validate current session first
+        user = self._get_user()
+        if not user:  # Validate current session first
             return {"error": "interaction_required", "error_description": "Log in required"}
         cache = self._load_cache()  # This web app maintains one cache per session
         app = self._build_msal_app(
             client_credential=self._client_credential, cache=cache)
-        accounts = app.get_accounts()
-        if accounts:  # TODO: Consider all account(s) belong to the current logged-in user
+        accounts = app.get_accounts(username=user.get("preferred_username"))
+        if accounts:
             result = app.acquire_token_silent_with_error(scopes, account=accounts[0])
             self._save_cache(cache)  # Cache might be refreshed. Save it.
             if result:
