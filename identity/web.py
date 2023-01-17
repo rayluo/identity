@@ -18,7 +18,7 @@ class Auth(object):
             session,
             authority,
             client_id,
-            client_credential=None,  # TODO: TBD
+            client_credential=None,
             ):
         """Create an identity helper for a web app.
 
@@ -72,7 +72,7 @@ class Auth(object):
         return id_token_claims if id_token_claims is not None and _is_valid(
             id_token_claims) else None
 
-    def log_in(self, scopes=None, redirect_uri=None, **kwargs):
+    def log_in(self, scopes=None, redirect_uri=None, state=None):
         """This is the first leg of the authentication/authorization.
 
         :param list scopes:
@@ -88,6 +88,9 @@ class Auth(object):
             using a different method named Device Code Flow.
             It is less convenient for end user, but still works.
 
+        :param str state:
+            Optional. Useful when the caller wants keep their own state.
+
         Returns a dict containing the ``auth_uri`` that you need to guide end user to visit.
         If your app has no redirect uri, this method will also return a ``user_code``
         which you shall also display to end user for them to use during log-in.
@@ -96,13 +99,15 @@ class Auth(object):
         app = self._build_msal_app()  # Only need a PCA at this moment
         if redirect_uri:
             flow = app.initiate_auth_code_flow(
-                _scopes, redirect_uri=redirect_uri, **kwargs)
+                _scopes, redirect_uri=redirect_uri, state=state)
             self._session[self._AUTH_FLOW] = flow
             return {
                 "auth_uri": self._session[self._AUTH_FLOW]["auth_uri"],
                 }
         else:
-            flow = app.initiate_device_flow(_scopes, **kwargs)
+            if state:
+                logger.warning("state only works in redirect_uri mode")
+            flow = app.initiate_device_flow(_scopes)
             self._session[self._AUTH_FLOW] = flow
             return {
                 "auth_uri": flow["verification_uri"],
@@ -162,7 +167,7 @@ class Auth(object):
         """
         return self._get_user()
 
-    def get_token_for_user(self, scopes, **kwargs):
+    def get_token_for_user(self, scopes):
         """Get access token for the current user, with specified scopes.
 
         :param list scopes:
@@ -176,13 +181,14 @@ class Auth(object):
             See also `OAuth2 specs <https://www.rfc-editor.org/rfc/rfc6749#section-5>`_.
         """
         error_response = {"error": "interaction_required", "error_description": "User need to log in and/or consent"}
-        if not self._get_user():  # Validate current session first
+        user = self._get_user()
+        if not user:  # Validate current session first
             return {"error": "interaction_required", "error_description": "Log in required"}
         cache = self._load_cache()  # This web app maintains one cache per session
         app = self._build_msal_app(
             client_credential=self._client_credential, cache=cache)
-        accounts = app.get_accounts()
-        if accounts:  # TODO: Consider all account(s) belong to the current logged-in user
+        accounts = app.get_accounts(username=user.get("preferred_username"))
+        if accounts:
             result = app.acquire_token_silent_with_error(scopes, account=accounts[0])
             self._save_cache(cache)  # Cache might be refreshed. Save it.
             if result:
