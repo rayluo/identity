@@ -31,6 +31,9 @@ You can install it by `pip install identity`.
 This library follows [Semantic Versioning](http://semver.org/).
 Your project should declare `identity` dependency with proper lower and upper bound.
 
+As of this writing, this library is still in preview. Please declare your dependency as
+`identity>=0.2,<0.3`.
+
 You can find the changes for each version under
 [Releases](https://github.com/rayluo/identity/releases).
 
