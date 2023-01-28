@@ -136,7 +136,15 @@ class Auth(object):  # This a low level helper which is web framework agnostic
         else:
             if state:
                 logger.warning("state only works in redirect_uri mode")
-            flow = app.initiate_device_flow(_scopes)
+            try:
+                flow = app.initiate_device_flow(_scopes)
+            except ValueError:  # Either Device Code endpoint unavailable or JsonDecodeError
+                return {
+                    "error": "configuration_error",
+                    "error_description":
+                        "This authority does not support device code flow. "
+                        "Please configure a redirect_uri to use auth code flow.",
+                    }
         if "error" in flow:
             return flow
         flow[self._EXPLICITLY_REQUESTED_SCOPES] = _scopes  # Can be different than the flow["scope"] which is possibly injected by OIDC library
