@@ -132,19 +132,23 @@ class Auth(object):
             * On success, a dict containing the info of current logged-in user.
               That dict is actually the claims from an already-validated ID token.
         """
+        auth_flow = self._session.get(self._AUTH_FLOW, {})
+        if not auth_flow:
+            raise ValueError(
+                "The web page with complete_log_in() "
+                "MUST be visited after the web page with log_in()")
         cache = self._load_cache()
         if auth_response:  # Auth Code flow
             try:
                 result = self._build_msal_app(
                     client_credential=self._client_credential,
                     cache=cache,
-                    ).acquire_token_by_auth_code_flow(
-                        self._session.get(self._AUTH_FLOW, {}), auth_response)
+                    ).acquire_token_by_auth_code_flow(auth_flow, auth_response)
             except ValueError as e:  # Usually caused by CSRF
                 return {"error": "invalid_grant", "error_description": str(e)}
         else:  # Device Code flow
             result = self._build_msal_app(cache=cache).acquire_token_by_device_flow(
-                self._session.get(self._AUTH_FLOW, {}),
+                auth_flow,
                 exit_condition=lambda flow: True,
                 )
         if "error" in result:
