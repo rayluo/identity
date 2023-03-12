@@ -66,6 +66,7 @@ class Auth(object):
             authority=self._authority,
             token_cache=cache,
             http_cache=self._http_cache,  # Share same http_cache among MSAL instances
+            instance_discovery=False,  # So that we stick with standard OIDC behavior
             )
 
     def _load_user_from_session(self):
