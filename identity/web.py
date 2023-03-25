@@ -72,7 +72,7 @@ class Auth(object):
         return id_token_claims if id_token_claims is not None and _is_valid(
             id_token_claims) else None
 
-    def log_in(self, scopes=None, redirect_uri=None, state=None):
+    def log_in(self, scopes=None, redirect_uri=None, state=None, prompt=None):
         """This is the first leg of the authentication/authorization.
 
         :param list scopes:
@@ -91,6 +91,10 @@ class Auth(object):
         :param str state:
             Optional. Useful when the caller wants keep their own state.
 
+        :param str prompt:
+            Optional. Valid values are defined in
+            `OIDC <https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest>`_
+
         Returns a dict containing the ``auth_uri`` that you need to guide end user to visit.
         If your app has no redirect uri, this method will also return a ``user_code``
         which you shall also display to end user for them to use during log-in.
@@ -99,7 +103,7 @@ class Auth(object):
         app = self._build_msal_app()  # Only need a PCA at this moment
         if redirect_uri:
             flow = app.initiate_auth_code_flow(
-                _scopes, redirect_uri=redirect_uri, state=state)
+                _scopes, redirect_uri=redirect_uri, state=state, prompt=prompt)
             self._session[self._AUTH_FLOW] = flow
             return {
                 "auth_uri": self._session[self._AUTH_FLOW]["auth_uri"],
