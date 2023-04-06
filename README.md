@@ -13,6 +13,9 @@ This Identity library is an authentication/authorization library that:
   [Microsoft's MSAL Python library](https://github.com/AzureAD/microsoft-authentication-library-for-python).
 * Written in Python, for Python apps.
 
+> DISCLAIMER: The code in this repo is not officially supported by Microsoft.
+> The intention of this repo is to unblock customers who would like to use a higher level API,
+> before such an API would be migrated to an Microsoft library with official support.
 
 ## Scenarios supported
 
