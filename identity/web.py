@@ -1,6 +1,8 @@
+import functools
 import logging
 import time
 
+import requests
 import msal
 
 
@@ -233,6 +235,10 @@ class Auth(object):
                 return result
         return {"error": "interaction_required", "error_description": "Cache missed"}
 
+    @functools.lru_cache(maxsize=1)
+    def _get_oidc_config(self):
+        return requests.get(f"{self._authority}/.well-known/openid-configuration").json()
+
     def log_out(self, homepage):
         # The vocabulary is "log out" (rather than "sign out") in the specs
         # https://openid.net/specs/openid-connect-frontchannel-1_0.html
@@ -248,8 +254,15 @@ class Auth(object):
         """
         self._session.pop(self._USER, None)  # Must
         self._session.pop(self._TOKEN_CACHE, None)  # Optional
-        return "{authority}/oauth2/v2.0/logout?post_logout_redirect_uri={hp}".format(
-            authority=self._authority, hp=homepage)
+        try:
+            # Empirically, Microsoft Entra ID's /v2.0 endpoint shows an account picker
+            # but its default (i.e. v1.0) endpoint will sign out the (only?) account
+            e = self._get_oidc_config().get("end_session_endpoint")
+        except requests.exceptions.RequestException as e:
+            logger.exception("Failed to get OIDC config")
+            return homepage
+        else:
+            return f"{e}?post_logout_redirect_uri={homepage}" if e else homepage
 
     def get_token_for_client(self, scopes):
         """Get access token for the current app, with specified scopes.
