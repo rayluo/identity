@@ -238,7 +238,7 @@ class Auth(object):
             result = app.acquire_token_silent_with_error(
                 scopes, account=accounts[0], force_refresh=force_refresh)
             self._save_cache(cache)  # Cache might be refreshed. Save it.
-            if result.get("id_token_claims"):
+            if result and result.get("id_token_claims"):
                 self._save_user_into_session(result["id_token_claims"])
             if result:
                 return result
