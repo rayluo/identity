@@ -68,6 +68,8 @@ jobs:
         startsWith(github.ref, 'refs/heads/release-')
       )
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # mandatory for trusted publishing
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python 3.9
@@ -91,7 +93,5 @@ jobs:
       # This would fail when secrets.PYPI_API_TOKEN is unavailable.
       # Workaround is setting secrets into ENV VAR which can then be used in condition.
       if: startsWith(github.ref, 'refs/tags')
-      uses: pypa/gh-action-pypi-publish@v1.4.2
-      with:
-        user: __token__
-        password: ${{ secrets.PYPI_API_TOKEN }}
+      uses: pypa/gh-action-pypi-publish@release/v1
+
