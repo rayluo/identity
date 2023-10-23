@@ -67,10 +67,11 @@ class Auth(object):
             http_cache=self._http_cache,  # Share same http_cache among MSAL instances
             )
 
-    def _get_user(self):
-        id_token_claims = self._session.get(self._USER)
-        return id_token_claims if id_token_claims is not None and _is_valid(
-            id_token_claims) else None
+    def _load_user_from_session(self):
+        return self._session.get(self._USER)  # It may already be expired
+
+    def _save_user_into_session(self, id_token_claims):
+        self._session[self._USER] = id_token_claims
 
     def log_in(self, scopes=None, redirect_uri=None, state=None, prompt=None):
         """This is the first leg of the authentication/authorization.
@@ -158,10 +159,10 @@ class Auth(object):
         if "error" in result:
             return result
         # TODO: Reject a re-log-in with a different account?
-        self._session[self._USER] = result["id_token_claims"]
+        self._save_user_into_session(result["id_token_claims"])
         self._save_cache(cache)
         self._session.pop(self._AUTH_FLOW, None)
-        return self._get_user()  # This triggers validation
+        return self._load_user_from_session()
 
     def get_user(self):
         """Returns None if the user has not logged in or no longer passes validation.
@@ -173,7 +174,14 @@ class Auth(object):
           You can use it to create an entry in your web app's local database.
         * Some of `other claims <https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims>`_
         """
-        return self._get_user()
+        id_token_claims = self._load_user_from_session()
+        if not id_token_claims:  # No user has logged in
+            return None
+        if _is_valid(id_token_claims):  # Did not expire
+            return id_token_claims
+        result = self._get_token_for_user([], force_refresh=True)  # Update ID token
+        if "error" not in result:
+            return self._load_user_from_session()
 
     def get_token_for_user(self, scopes):
         """Get access token for the current user, with specified scopes.
@@ -188,17 +196,23 @@ class Auth(object):
 
             See also `OAuth2 specs <https://www.rfc-editor.org/rfc/rfc6749#section-5>`_.
         """
+        return self._get_token_for_user(scopes)
+
+    def _get_token_for_user(self, scopes, force_refresh=None):
         error_response = {"error": "interaction_required", "error_description": "User need to log in and/or consent"}
-        user = self._get_user()
-        if not user:  # Validate current session first
+        user = self._load_user_from_session()
+        if not user:
             return {"error": "interaction_required", "error_description": "Log in required"}
         cache = self._load_cache()  # This web app maintains one cache per session
         app = self._build_msal_app(
             client_credential=self._client_credential, cache=cache)
         accounts = app.get_accounts(username=user.get("preferred_username"))
         if accounts:
-            result = app.acquire_token_silent_with_error(scopes, account=accounts[0])
+            result = app.acquire_token_silent_with_error(
+                scopes, account=accounts[0], force_refresh=force_refresh)
             self._save_cache(cache)  # Cache might be refreshed. Save it.
+            if result.get("id_token_claims"):
+                self._save_user_into_session(result["id_token_claims"])
             if result:
                 return result
         return {"error": "interaction_required", "error_description": "Cache missed"}
@@ -243,8 +257,6 @@ class Auth(object):
 
 
 def _is_valid(id_token_claims, skew=None, seconds=None):
-    # This is an internal helper.
-    # But the customer could implement their own helper to wrap on top of get_user().
     skew = 210 if skew is None else skew
     now = time.time()
     logger.debug("now=%s, iat=%s, skew=%s", now, id_token_claims["iat"], skew)
