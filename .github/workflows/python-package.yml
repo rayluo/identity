@@ -18,31 +18,18 @@ jobs:
       TRAVIS: true
 
     # Derived from https://docs.github.com/en/actions/guides/building-and-testing-python#starting-with-the-python-workflow-template
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # The latest 22.04 no longer supports Python 3.5, 3.6
     strategy:
       matrix:
         # See also https://endoflife.date/python
-        python-version: [3.7, 3.8, 3.9, "3.10", "3.11"]
+        python-version: [3.7, 3.8, 3.9, "3.10", 3.11, 3.12]
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-
-    # Derived from https://github.com/actions/cache/blob/main/examples.md#using-pip-to-get-cache-location
-    # However, a before-and-after test shows no improvement in this repo,
-    # possibly because the bottlenect was not in downloading those small python deps.
-    - name: Get pip cache dir from pip 20.1+
-      id: pip-cache
-      run: |
-        echo "::set-output name=dir::$(pip cache dir)"
-    - name: pip cache
-      uses: actions/cache@v2
-      with:
-        path: ${{ steps.pip-cache.outputs.dir }}
-        key: ${{ runner.os }}-py${{ matrix.python-version }}-pip-${{ hashFiles('**/setup.py', '**/requirements.txt') }}
 
     - name: Install dependencies
       run: |
@@ -61,6 +48,10 @@ jobs:
 
   cd:
     needs: ci
+    # Note: github.event.pull_request.draft == false WON'T WORK in "if" statement,
+    # because the triggered event is a push, not a pull_request.
+    # This means each commit will trigger a release on TestPyPI.
+    # Those releases will only succeed when each push has a new version number: a1, a2, a3, etc.
     if: |
       github.event_name == 'push' &&
       (
@@ -68,12 +59,13 @@ jobs:
         startsWith(github.ref, 'refs/heads/release-')
       )
     runs-on: ubuntu-latest
+    # Based on trusted publisher https://docs.pypi.org/trusted-publishers/
     permissions:
       id-token: write  # mandatory for trusted publishing
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Set up Python 3.9
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: 3.9
     - name: Build a package for release
