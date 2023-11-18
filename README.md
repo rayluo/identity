@@ -15,8 +15,8 @@ This Identity library is an authentication/authorization library that:
 
 > DISCLAIMER: The code in this repo is not officially supported by Microsoft and is not intended for production use.
 > The intention of this repo is to unblock customers who would like to use a higher level API,
-> before such an API has been migrated to an Microsoft library with official support. Migration of this API to official support is not guaranteed and is not currently on the MSAL roadmap. 
-> Please ensure to fully test any code used from this repository to ensure it works in your environment. 
+> before such an API has been migrated to an Microsoft library with official support. Migration of this API to official support is not guaranteed and is not currently on the MSAL roadmap.
+> Please ensure to fully test any code used from this repository to ensure it works in your environment.
 
 ## Scenarios supported
 
@@ -35,14 +35,15 @@ You can install it by `pip install identity`.
 This library follows [Semantic Versioning](http://semver.org/).
 Your project should declare `identity` dependency with proper lower and upper bound.
 
-As of this writing, this library is still in preview. Please declare your dependency as
-`identity>=0.2,<0.3`.
-
 You can find the changes for each version under
 [Releases](https://github.com/rayluo/identity/releases).
 
 
 ## Usage
 
-Sample coming soon.
+* Read our [docs here](https://identity-library.readthedocs.io/en/latest/)
+* [web app sample for Flask](https://github.com/Azure-Samples/ms-identity-python-webapp)
+* If you want your samples for other web frameworks showing up here,
+  please create an issue to let us know.
+
 
