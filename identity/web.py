@@ -150,7 +150,8 @@ class Auth(object):
                     cache=cache,
                     ).acquire_token_by_auth_code_flow(auth_flow, auth_response)
             except ValueError as e:  # Usually caused by CSRF
-                return {"error": "invalid_grant", "error_description": str(e)}
+                logger.exception("Encountered %s", e)
+                return {}  # Return a no-op for this non-actionable error
         else:  # Device Code flow
             result = self._build_msal_app(cache=cache).acquire_token_by_device_flow(
                 auth_flow,
