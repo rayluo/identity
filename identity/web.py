@@ -105,6 +105,8 @@ class Auth(object):
         if redirect_uri:
             flow = app.initiate_auth_code_flow(
                 _scopes, redirect_uri=redirect_uri, state=state, prompt=prompt)
+            if "error" in flow:
+                return flow
             self._session[self._AUTH_FLOW] = flow
             return {
                 "auth_uri": self._session[self._AUTH_FLOW]["auth_uri"],
@@ -113,6 +115,8 @@ class Auth(object):
             if state:
                 logger.warning("state only works in redirect_uri mode")
             flow = app.initiate_device_flow(_scopes)
+            if "error" in flow:
+                return flow
             self._session[self._AUTH_FLOW] = flow
             return {
                 "auth_uri": flow["verification_uri"],
