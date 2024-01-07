@@ -19,6 +19,7 @@ class Auth(object):
             authority,
             client_id,
             client_credential=None,
+            http_cache=None,
             ):
         """Create an identity helper for a web app.
 
@@ -44,7 +45,7 @@ class Auth(object):
         self._authority = authority
         self._client_id = client_id
         self._client_credential = client_credential
-        self._http_cache = {}  # All subsequent MSAL instances will share this
+        self._http_cache = {} if http_cache is None else http_cache   # All subsequent MSAL instances will share this
 
     def _load_cache(self):
         cache = msal.SerializableTokenCache()
@@ -100,6 +101,8 @@ class Auth(object):
         If your app has no redirect uri, this method will also return a ``user_code``
         which you shall also display to end user for them to use during log-in.
         """
+        if not self._client_id:
+            raise ValueError("client_id must be provided")
         _scopes = scopes or []
         app = self._build_msal_app()  # Only need a PCA at this moment
         if redirect_uri:

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+{# The template uses only a common subset of Django and Flask syntax. #}
+{# See also https://jinja.palletsprojects.com/en/latest/switching/#django #}
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>Login</title>
+  </head>
+  <body>
+    <h1>Login</h1>
+
+    {% if user_code %}
+    <ol>
+      <li>To sign in, type <b>{{ user_code }}</b> into
+        <a href='{{ auth_uri }}' target=_blank>{{ auth_uri }}</a>
+        to authenticate.
+      </li>
+      <li>And then <a href="{{ auth_response_url }}">proceed</a>.</li>
+    </ol>
+    {% else %}
+    <ul><li><a href='{{ auth_uri }}'>Sign In</a></li></ul>
+    {% endif %}
+
+    {% if reset_password_url %}
+    <hr>
+    <a href='{{ reset_password_url }}'>Reset Password</a>
+    {% endif %}
+  </body>
+</html>
+

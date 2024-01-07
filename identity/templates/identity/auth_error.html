@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+{# The template uses only a common subset of Django and Flask syntax. #}
+{# See also https://jinja.palletsprojects.com/en/latest/switching/#django #}
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    {% if reset_password_url and error_description and "AADB2C90118" in error_description %}<!-- This will be reached when user forgot their password -->
+      <!-- See also https://docs.microsoft.com/en-us/azure/active-directory-b2c/active-directory-b2c-reference-policies#linking-user-flows -->
+      <meta http-equiv="refresh" content='5;{{reset_password_url}}'>
+    {% endif %}
+    <title>Auth: Error</title>
+  </head>
+  <body>
+    <h2>Login Failure</h2>
+    <dl>
+      <dt>{{error}}</dt>
+      <dd>{{error_description}}</dd>
+    </dl>
+    <hr>
+    <a href="/">Homepage</a>
+  </body>
+</html>

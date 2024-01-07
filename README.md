@@ -4,7 +4,7 @@
 This Identity library is an authentication/authorization library that:
 
 * Suitable for apps that are targeting end users on
-  [Microsoft identity platform](https://learn.microsoft.com/en-us/azure/active-directory/develop/v2-overview)
+  [Microsoft identity platform, a.k.a. Microsoft Entra ID](https://learn.microsoft.com/en-us/azure/active-directory/develop/v2-overview)
   (which includes Work or school accounts provisioned through Azure AD,
   and Personal Microsoft accounts such as Skype, Xbox, Outlook.com).
 * Currently designed for web apps,
@@ -42,7 +42,8 @@ You can find the changes for each version under
 ## Usage
 
 * Read our [docs here](https://identity-library.readthedocs.io/en/latest/)
-* [web app sample for Flask](https://github.com/Azure-Samples/ms-identity-python-webapp)
+* [Web app sample for Flask](https://github.com/Azure-Samples/ms-identity-python-webapp)
+* [Web app sample for Django](https://github.com/Azure-Samples/ms-identity-python-webapp-django)
 * If you want your samples for other web frameworks showing up here,
   please create an issue to let us know.
 
