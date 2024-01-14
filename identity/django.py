@@ -1,22 +1,41 @@
 from functools import partial, wraps
 from html import escape
+import logging
+import os
 from typing import List  # Needed in Python 3.7 & 3.8
+from urllib.parse import urlparse
 
 from django.shortcuts import redirect, render
-from django.urls import path, reverse
+from django.urls import include, path, reverse
 
 from .web import Auth as _Auth
 
 
+logger = logging.getLogger(__name__)
+
+
+def _parse_redirect_uri(redirect_uri):
+    """Parse the redirect_uri into a tuple of (django_route, view)"""
+    if redirect_uri:
+        prefix, view = os.path.split(urlparse(redirect_uri).path)
+        if not view:
+            raise ValueError(
+                'redirect_uri must contain a path which does not end with a "/"')
+        route = prefix[1:] if prefix and prefix[0] == '/' else prefix
+        if route:
+            route += "/"
+        return route, view
+    else:
+        return "", None
+
 class Auth(object):
-    _name_of_auth_response_view = f"{__name__}.auth_response"  # Presumably unique
 
     def __init__(
         self,
         client_id: str,
         *,
         client_credential=None,
-        redirect_view: str=None,
+        redirect_uri: str=None,
         scopes: List[str]=None,
         authority: str=None,
 
@@ -38,20 +57,16 @@ class Auth(object):
             It is somtimes a string.
             The actual format is decided by the underlying auth library. TBD.
 
-        :param str redirect_view:
-            This will be used as the last segment to form your project's redirect_uri.
+        :param str redirect_uri:
+            This will be used to mount your project's auth views accordingly.
 
-            For example, if you provide an input here as "auth_response",
-            and your Django project mounts this ``Auth`` object's ``urlpatterns``
-            by ``path("prefix/", include(auth.urlpatterns))``,
-            then the actual redirect_uri will become ``.../prefix/auth_response``
-            which MUST match what you have registered for your web application.
+            For example, if your input here is "https://example.com/x/y/z/redirect",
+            then your project's redirect page will be mounted at "/x/y/z/redirect",
+            login page will be at "/x/y/z/login",
+            and logout page will be at "/x/y/z/logout".
 
-            Typically, if your application uses a flat redirect_uri as
-            ``https://example.com/auth_response``,
-            your shall use an redirect_view value as ``auth_response``,
-            and then mount it by ``path("", include(auth.urlpatterns))``.
-
+            Afterwards, all you need to do is to insert ``auth.urlpattern`` into
+            your project's ``urlpatterns`` list in ``your_project/urls.py``.
 
         :param list[str] scopes:
             A list of strings representing the scopes used during login.
@@ -83,20 +98,20 @@ class Auth(object):
         """
         self._client_id = client_id
         self._client_credential = client_credential
-        if redirect_view and "/" in redirect_view:
-            raise ValueError("redirect_view shall not contain slash")
-        self._redirect_view = redirect_view
         self._scopes = scopes
-        self.urlpatterns = [  # Note: path(..., view, ...) does not accept classmethod
-            path('login', self.login),
-            path('logout', self.logout),
-            path(
-                redirect_view or 'auth_response',  # The latter is used by device code flow
-                self.auth_response,
-                name=self._name_of_auth_response_view,
-                ),
-        ]
         self._http_cache = {}  # All subsequent _Auth instances will share this
+
+        self._redirect_uri = redirect_uri
+        route, self._redirect_view = _parse_redirect_uri(redirect_uri)
+        self.urlpattern = path(route, include([
+            # Note: path(..., view, ...) does not accept classmethod
+            path('login', self.login),
+            path('logout', self.logout, name=f"{__name__}.logout"),
+            path(
+                self._redirect_view or 'auth_response',  # The latter is used by device code flow
+                self.auth_response,
+            ),
+        ]))
 
         # Note: We do not use overload, because we want to allow the caller to
         # have only one code path that relay in all the optional parameters.
@@ -152,7 +167,11 @@ class Auth(object):
             )["auth_uri"] if self._edit_profile_auth and self._redirect_view else None
 
     def login(self, request):
-        """The login view"""
+        """The login view.
+
+        You can redirect to the login page from inside a view, by calling
+        ``return redirect(auth.login)``.
+        """
         if not self._client_id:
             return self._render_auth_error(
                 request,
@@ -161,6 +180,10 @@ class Auth(object):
                 )
         redirect_uri = request.build_absolute_uri(
             self._redirect_view) if self._redirect_view else None
+        if redirect_uri != self._redirect_uri:
+            logger.warning(
+                "redirect_uri mismatch: configured = %s, calculated = %s",
+                self._redirect_uri, redirect_uri)
         log_in_result = self._build_auth(request).log_in(
             scopes=self._scopes,  # Have user consent to scopes during log-in
             redirect_uri=redirect_uri,  # Optional. If present, this absolute URL must match your app's redirect_uri registered in Azure Portal
@@ -175,7 +198,7 @@ class Auth(object):
         return render(request, "identity/login.html", dict(
             log_in_result,
             reset_password_url=self._get_reset_password_url(request),
-            auth_response_url=reverse(self._name_of_auth_response_view),
+            auth_response_url=reverse(self.auth_response),
             ))
 
     def _render_auth_error(self, request, error, error_description=None):
@@ -187,7 +210,10 @@ class Auth(object):
             ))
 
     def auth_response(self, request):
-        """The auth_response view"""
+        """The auth_response view.
+
+        You should not need to call this view directly.
+        """
         result = self._build_auth(request).complete_log_in(request.GET)
         if "error" in result:
             return self._render_auth_error(
@@ -198,7 +224,12 @@ class Auth(object):
         return redirect("index")  # TODO: Go back to a customizable url
 
     def logout(self, request):
-        """The logout view"""
+        """The logout view.
+
+        The logout url is also available with the name "identity.django.logout".
+        So you can use ``{% url "identity.django.logout" %}`` to get the url
+        from inside a template.
+        """
         return redirect(
             self._build_auth(request).log_out(request.build_absolute_uri("/")))
 
