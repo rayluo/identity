@@ -146,9 +146,16 @@ class Auth(object):
         """
         auth_flow = self._session.get(self._AUTH_FLOW, {})
         if not auth_flow:
-            raise ValueError(
-                "The web page with complete_log_in() "
-                "MUST be visited after the web page with log_in()")
+            logger.warning(
+                "We found no prior log_in() info from current session. "
+                "This situation may be caused by: "
+                "(1) sessions were all reset due to a recent server restart, "
+                "in which case you can simply start afresh with a new log-in, or "
+                "(2) the session was stored on the file system of another server, "
+                "in which case you must use either a centralized session store "
+                "or a load balancer with sticky session (a.k.a. affinity cookie)."
+            )
+            return {}  # Return a no-op for this non-actionable error
         cache = self._load_cache()
         if auth_response:  # Auth Code flow
             try:
