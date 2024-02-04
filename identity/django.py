@@ -158,12 +158,14 @@ class Auth(object):
 
     def _get_reset_password_url(self, request):
         return self._reset_password_auth.log_in(
-            redirect_uri=request.build_absolute_uri(self._redirect_view)
+            redirect_uri=request.build_absolute_uri(self._redirect_view),
+            state=self._reset_password_auth.__STATE_NO_OP,
             )["auth_uri"] if self._reset_password_auth and self._redirect_view else None
 
     def get_edit_profile_url(self, request):
         return self._edit_profile_auth.log_in(
-            redirect_uri=request.build_absolute_uri(self._redirect_view)
+            redirect_uri=request.build_absolute_uri(self._redirect_view),
+            state=self._edit_profile_auth.__STATE_NO_OP,
             )["auth_uri"] if self._edit_profile_auth and self._redirect_view else None
 
     def login(self, request):

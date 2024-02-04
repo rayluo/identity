@@ -14,6 +14,7 @@ class Auth(object):
     _TOKEN_CACHE = "_token_cache"
     _AUTH_FLOW = "_auth_flow"
     _USER = "_logged_in_user"
+    __STATE_NO_OP = f"{__name__}.no_op"  # A special state to indicate an auth response shall be ignored
     def __init__(
             self,
             *,
@@ -147,6 +148,8 @@ class Auth(object):
             * On success, a dict containing the info of current logged-in user.
               That dict is actually the claims from an already-validated ID token.
         """
+        if auth_response and auth_response.get("state") == self.__STATE_NO_OP:
+            return {}  # Return a no-op, as that is what the request opted for
         auth_flow = self._session.get(self._AUTH_FLOW, {})
         if not auth_flow:
             logger.warning(
