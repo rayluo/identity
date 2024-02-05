@@ -143,7 +143,9 @@ class Auth(object):
             self._edit_profile_auth = None
             self._reset_password_auth = None
         if not self._authority:
-            raise ValueError(
+            logger.error(  # Do not raise exception, because
+                # we want to render a nice error page later during login,
+                # which is a better developer experience especially for deployment
                 "Either authority or b2c_tenant_name and b2c_signup_signin_user_flow "
                 "must be provided")
 
@@ -174,11 +176,14 @@ class Auth(object):
         You can redirect to the login page from inside a view, by calling
         ``return redirect(auth.login)``.
         """
-        if not self._client_id:
+        if not (self._client_id and self._authority):
             return self._render_auth_error(
                 request,
                 error="configuration_error",
-                error_description="Did you forget to setup CLIENT_ID (and other configuration)?",
+                error_description="""Almost there. Did you forget to setup
+(1) authority, or the b2c_tenant_name and b2c_signup_signin_user_flow pair
+(2) client_id
+?""",
                 )
         redirect_uri = request.build_absolute_uri(
             self._redirect_view) if self._redirect_view else None
