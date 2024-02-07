@@ -146,6 +146,7 @@ class Auth(object):
               That dict is actually the claims from an already-validated ID token.
         """
         auth_flow = self._session.get(self._AUTH_FLOW, {})
+        
         if not auth_flow:
             logger.warning(
                 "We found no prior log_in() info from current session. "
@@ -157,7 +158,9 @@ class Auth(object):
                 "or a load balancer with sticky session (a.k.a. affinity cookie)."
             )
             return {}  # Return a no-op for this non-actionable error
+        
         cache = self._load_cache()
+        
         if auth_response:  # Auth Code flow
             try:
                 result = self._build_msal_app(
@@ -172,12 +175,14 @@ class Auth(object):
                 auth_flow,
                 exit_condition=lambda flow: True,
                 )
+        
         if "error" in result:
             return result
         # TODO: Reject a re-log-in with a different account?
         self._save_user_into_session(result["id_token_claims"])
         self._save_cache(cache)
         self._session.pop(self._AUTH_FLOW, None)
+        
         return self._load_user_from_session()
 
     def get_user(self):
