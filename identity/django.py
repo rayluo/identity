@@ -170,8 +170,15 @@ class Auth(object):
             state=self._edit_profile_auth.__STATE_NO_OP,
             )["auth_uri"] if self._edit_profile_auth and self._redirect_view else None
 
-    def login(self, request):
+    def login(
+        self,
+        request,
+        next_link:str = None,  # Obtain the next_link from the app developer,
+            # NOT from query string which could become an open redirect vulnerability.
+    ):
         """The login view.
+
+        :param str next_link: The path to redirect to after login.
 
         You can redirect to the login page from inside a view, by calling
         ``return redirect(auth.login)``.
@@ -195,6 +202,7 @@ class Auth(object):
             scopes=self._scopes,  # Have user consent to scopes during log-in
             redirect_uri=redirect_uri,  # Optional. If present, this absolute URL must match your app's redirect_uri registered in Azure Portal
             prompt="select_account",  # Optional. More values defined in  https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
+            next_link=next_link,
             )
         if "error" in log_in_result:
             return self._render_auth_error(
@@ -228,7 +236,9 @@ class Auth(object):
                 error=result["error"],
                 error_description=result.get("error_description"),
                 )
-        return redirect("/")  # Use a relative URL rather than a hard-coded view name
+        return redirect(
+            result.get("next_link")
+            or "/")  # Use a relative URL rather than a hard-coded view name
 
     def logout(self, request):
         """The logout view.
@@ -265,7 +275,8 @@ class Auth(object):
         def wrapper(request, *args, **kwargs):
             auth = self._build_auth(request)
             if not auth.get_user():
-                return redirect(self.login)
+                # Save an http 302 by calling self.login(request) instead of redirect(self.login)
+                return self.login(request, next_link=request.get_full_path())
             return function(request, *args, **kwargs)
         return wrapper
 

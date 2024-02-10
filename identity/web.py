@@ -15,6 +15,7 @@ class Auth(object):
     _AUTH_FLOW = "_auth_flow"
     _USER = "_logged_in_user"
     __STATE_NO_OP = f"{__name__}.no_op"  # A special state to indicate an auth response shall be ignored
+    __NEXT_LINK = f"{__name__}.next_link"  # The next page after a successful auth
     def __init__(
             self,
             *,
@@ -78,7 +79,10 @@ class Auth(object):
     def _save_user_into_session(self, id_token_claims):
         self._session[self._USER] = id_token_claims
 
-    def log_in(self, scopes=None, redirect_uri=None, state=None, prompt=None):
+    def log_in(
+        self, scopes=None, redirect_uri=None, state=None, prompt=None,
+        next_link=None,
+    ):
         """This is the first leg of the authentication/authorization.
 
         :param list scopes:
@@ -101,6 +105,8 @@ class Auth(object):
             Optional. Valid values are defined in
             `OIDC <https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest>`_
 
+        :param str next_link: The link, typically a path, to redirect to after login.
+
         Returns a dict containing the ``auth_uri`` that you need to guide end user to visit.
         If your app has no redirect uri, this method will also return a ``user_code``
         which you shall also display to end user for them to use during log-in.
@@ -112,19 +118,19 @@ class Auth(object):
         if redirect_uri:
             flow = app.initiate_auth_code_flow(
                 _scopes, redirect_uri=redirect_uri, state=state, prompt=prompt)
-            if "error" in flow:
-                return flow
-            self._session[self._AUTH_FLOW] = flow
-            return {
-                "auth_uri": self._session[self._AUTH_FLOW]["auth_uri"],
-                }
         else:
             if state:
                 logger.warning("state only works in redirect_uri mode")
             flow = app.initiate_device_flow(_scopes)
-            if "error" in flow:
-                return flow
-            self._session[self._AUTH_FLOW] = flow
+        if "error" in flow:
+            return flow
+        flow[self.__NEXT_LINK] = next_link
+        self._session[self._AUTH_FLOW] = flow
+        if redirect_uri:
+            return {
+                "auth_uri": self._session[self._AUTH_FLOW]["auth_uri"],
+                }
+        else:
             return {
                 "auth_uri": flow["verification_uri"],
                 "user_code": flow["user_code"],
@@ -145,7 +151,7 @@ class Auth(object):
         :return:
             * On failure, a dict containing "error" and optional "error_description",
               for you to somehow render it to end user.
-            * On success, a dict containing the info of current logged-in user.
+            * On success, a dict as {"next_link": "/path/to/next/page/if/any"}
               That dict is actually the claims from an already-validated ID token.
         """
         if auth_response and auth_response.get("state") == self.__STATE_NO_OP:
@@ -182,8 +188,8 @@ class Auth(object):
         # TODO: Reject a re-log-in with a different account?
         self._save_user_into_session(result["id_token_claims"])
         self._save_cache(cache)
-        self._session.pop(self._AUTH_FLOW, None)
-        return self._load_user_from_session()
+        flow = self._session.pop(self._AUTH_FLOW, {})
+        return {"next_link": flow.get(self.__NEXT_LINK)}
 
     def get_user(self):
         """Returns None if the user has not logged in or no longer passes validation.
