@@ -4,6 +4,7 @@ import logging
 import os
 from typing import List  # Needed in Python 3.7 & 3.8
 from urllib.parse import urlparse
+import warnings
 
 from django.shortcuts import redirect, render
 from django.urls import include, path, reverse
@@ -69,7 +70,7 @@ class Auth(object):
             your project's ``urlpatterns`` list in ``your_project/urls.py``.
 
         :param list[str] scopes:
-            A list of strings representing the scopes used during login.
+            Deprecated. Use @login_required(..., scopes=[...]) instead.
 
         :param str authority:
             The authority which your application registers with.
@@ -98,7 +99,11 @@ class Auth(object):
         """
         self._client_id = client_id
         self._client_credential = client_credential
-        self._scopes = scopes
+        if scopes:
+            warnings.warn(
+                "The 'scopes' parameter is deprecated. "
+                "Use @login_required(..., scopes=[...]) instead",
+                DeprecationWarning)
         self._http_cache = {}  # All subsequent _Auth instances will share this
 
         self._redirect_uri = redirect_uri
@@ -179,6 +184,7 @@ class Auth(object):
         request,
         next_link:str = None,  # Obtain the next_link from the app developer,
             # NOT from query string which could become an open redirect vulnerability.
+        scopes: List[str]=None,
     ):
         # The login view.
         # App developer could redirect to the login page from inside a view,
@@ -201,7 +207,7 @@ class Auth(object):
                 "redirect_uri mismatch: configured = %s, calculated = %s",
                 self._redirect_uri, redirect_uri)
         log_in_result = self._build_auth(request).log_in(
-            scopes=self._scopes,  # Have user consent to scopes during log-in
+            scopes=scopes,  # Have user consent to scopes (if any) during log-in
             redirect_uri=redirect_uri,  # Optional. If present, this absolute URL must match your app's redirect_uri registered in Azure Portal
             prompt="select_account",  # Optional. More values defined in  https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
             next_link=next_link,
@@ -275,27 +281,64 @@ class Auth(object):
         """
         return self._build_auth(request).get_token_for_user(scopes)
 
-    def login_required(
+    def login_required(  # Named after Django's login_required
         self,
-        function=None,  # TODO: /, *, redirect_field_name=None, login_url=None,
+        function=None,
+        /,  # Requires Python 3.8+
+        *,
+        scopes: List[str]=None,
     ):
-        # With or without parameter. Inspired by https://stackoverflow.com/a/39335652
+        """A decorator that ensures the user to be logged in,
+        and optinoally also have consented to a list of scopes.
 
-        # With parameter
+        A user not meeting those requirements will be brought to the login page.
+
+        Usage::
+
+            @settings.AUTH.login_required
+            def my_view(request):
+                return render(request, 'index.html', dict(
+                    user=settings, AUTH.get_user(request),  # User would not be None
+                        # since we decorated this view with @login_required
+                    ))
+
+            @settings.AUTH.login_required(scopes=["scope1", "scope2"])
+            def my_view2(request):
+                # token would contain valid result since we decorated this view
+                # with @login_required(..., scopes=[...])
+                token = settings.AUTH.get_token_for_user(request, ["scope1", "scope2"])
+                api_result = requests.get(  # Use access token to call downstream api
+                    "https://example.com/endpoint",
+                    headers={'Authorization': 'Bearer ' + token['access_token']},
+                    timeout=30,
+                ).json()  # Here we assume the response format is json
+                ...
+        """
+        # With or without brackets. Inspired by https://stackoverflow.com/a/39335652/728675
+
+        # Called with brackets, i.e. @login_required()
         if function is None:
+            logger.debug(f"Called as @login_required(..., scopes={scopes})")
             return partial(
                 self.login_required,
-                #redirect_field_name=redirect_field_name,
-                #login_url=login_url,
+                scopes=scopes,
             )
 
-        # Without parameter
+        # Called without brackets, i.e. @login_required
         @wraps(function)
         def wrapper(request, *args, **kwargs):
             auth = self._build_auth(request)
-            if not auth.get_user():
+            need_consent = False
+            if scopes:
+                result = auth.get_token_for_user(scopes)
+                need_consent = not (isinstance(result, dict) and "error" not in result)
+            if need_consent or not auth.get_user():
                 # Save an http 302 by calling self.login(request) instead of redirect(self.login)
-                return self.login(request, next_link=request.get_full_path())
+                return self.login(
+                    request,
+                    next_link=request.get_full_path(),
+                    scopes=scopes,
+                    )
             return function(request, *args, **kwargs)
         return wrapper
 
