@@ -14,6 +14,7 @@ class Auth(object):
     _TOKEN_CACHE = "_token_cache"
     _AUTH_FLOW = "_auth_flow"
     _USER = "_logged_in_user"
+    _EXPLICITLY_REQUESTED_SCOPES = f"{__name__}.explicitly_requested_scopes"
     __STATE_NO_OP = f"{__name__}.no_op"  # A special state to indicate an auth response shall be ignored
     __NEXT_LINK = f"{__name__}.next_link"  # The next page after a successful auth
     def __init__(
@@ -124,6 +125,7 @@ class Auth(object):
             flow = app.initiate_device_flow(_scopes)
         if "error" in flow:
             return flow
+        flow[self._EXPLICITLY_REQUESTED_SCOPES] = _scopes  # Can be different than the flow["scope"] which is possibly injected by OIDC library
         flow[self.__NEXT_LINK] = next_link
         self._session[self._AUTH_FLOW] = flow
         if redirect_uri:
@@ -185,6 +187,18 @@ class Auth(object):
                 )
         if "error" in result:
             return result
+        if "scope" in result:
+            # Only partial scopes were granted, others were likely unsupported.
+            # according to https://datatracker.ietf.org/doc/html/rfc6749#section-5.1
+            ungranted_scopes = set(
+                auth_flow[self._EXPLICITLY_REQUESTED_SCOPES]
+                ) - set(result["scope"].split())
+            if ungranted_scopes:
+                return {
+                    "error": "invalid_scope",  # https://datatracker.ietf.org/doc/html/rfc6749#section-5.2
+                    "error_description": "Ungranted scope(s): {}".format(
+                        ' '.join(ungranted_scopes)),
+                }
         # TODO: Reject a re-log-in with a different account?
         self._save_user_into_session(result["id_token_claims"])
         self._save_cache(cache)
@@ -211,7 +225,7 @@ class Auth(object):
             return self._load_user_from_session()
 
     def get_token_for_user(self, scopes):
-        """Get access token for the current user, with specified scopes.
+        """Get access token silently for the current user, with specified scopes.
 
         :param list scopes:
             A list of scopes that your app will need to use.

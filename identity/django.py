@@ -339,7 +339,7 @@ class Auth(object):
             user = auth.get_user()
             if user:
                 if scopes:
-                    result = auth.get_token_for_user(scopes)
+                    result = auth.get_token_for_user(scopes)  # Silently via RT
                     if isinstance(result, dict) and "access_token" in result:
                         context = dict(
                             user=user,
@@ -349,10 +349,14 @@ class Auth(object):
                             expires_in=result.get("expires_in", 300),
                             refresh_token=result.get("refresh_token"),
                         )
-                        if result.get("scope"):
-                            context["scopes"] = result["scope"].split()
+                        context["scopes"] = result["scope"].split() if result.get(
+                            "scope") else scopes
                     else:
-                        pass  # Token request failed. So we set no context.
+                        logger.error(
+                            "Access token unavailable. Error: %s, Desc: %s, keys: %s",
+                            result.get("error"), result.get("error_description"),
+                            result.keys())
+                        context = None  # Token request failed
                 else:
                     context = {"user": user}
                 if context:
