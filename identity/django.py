@@ -256,6 +256,7 @@ class Auth(object):
             self._build_auth(request).log_out(request.build_absolute_uri("/")))
 
     def get_user(self, request):
+        ""  # Nullify the following docstring, because we recommend using login_required()
         """Get the logged-in user of the request.
 
         :param request: The request object of the current view.
@@ -267,6 +268,7 @@ class Auth(object):
         return self._build_auth(request).get_user()
 
     def get_token_for_user(self, request, scopes: List[str]):
+        ""  # Nullify the following docstring, because we recommend using login_required()
         """Get access token for the current user, with specified scopes.
 
         :param list scopes:
@@ -291,28 +293,34 @@ class Auth(object):
         """A decorator that ensures the user to be logged in,
         and optinoally also have consented to a list of scopes.
 
-        A user not meeting those requirements will be brought to the login page.
+        A user not meeting the requirement(s) will be brought to the login page.
+        For already logged-in user, the view will be called with a keyword argument
+        named "context" which is a dict containing the user object.
 
         Usage::
 
             @settings.AUTH.login_required
-            def my_view(request):
+            def my_view(request, *, context):
                 return render(request, 'index.html', dict(
-                    user=settings, AUTH.get_user(request),  # User would not be None
-                        # since we decorated this view with @login_required
+                    user=context["user"],  # User is guaranteed to be present
+                        # because we decorated this view with @login_required
                     ))
 
-            @settings.AUTH.login_required(scopes=["scope1", "scope2"])
-            def my_view2(request):
-                # token would contain valid result since we decorated this view
-                # with @login_required(..., scopes=[...])
-                token = settings.AUTH.get_token_for_user(request, ["scope1", "scope2"])
-                api_result = requests.get(  # Use access token to call downstream api
-                    "https://example.com/endpoint",
-                    headers={'Authorization': 'Bearer ' + token['access_token']},
-                    timeout=30,
-                ).json()  # Here we assume the response format is json
-                ...
+        :param list[str] scopes:
+            A list of scopes that your app will need to use.
+            When present, the context will also contain an "access_token",
+            "token_type", and likely "expires_in" and "refresh_token".
+
+            Usage::
+
+                @settings.AUTH.login_required(scopes=["scope1", "scope2"])
+                def my_view2(request, *, context):
+                    api_result = requests.get(  # Use access token to call an api
+                        "https://example.com/endpoint",
+                        headers={'Authorization': 'Bearer ' + context['access_token']},
+                        timeout=30,
+                    ).json()  # Here we assume the response format is json
+                    ...
         """
         # With or without brackets. Inspired by https://stackoverflow.com/a/39335652/728675
 
@@ -328,17 +336,42 @@ class Auth(object):
         @wraps(function)
         def wrapper(request, *args, **kwargs):
             auth = self._build_auth(request)
-            need_consent = False
-            if scopes:
-                result = auth.get_token_for_user(scopes)
-                need_consent = not (isinstance(result, dict) and "error" not in result)
-            if need_consent or not auth.get_user():
-                # Save an http 302 by calling self.login(request) instead of redirect(self.login)
-                return self.login(
-                    request,
-                    next_link=request.get_full_path(),
-                    scopes=scopes,
-                    )
-            return function(request, *args, **kwargs)
+            user = auth.get_user()
+            if user:
+                if scopes:
+                    result = auth.get_token_for_user(scopes)
+                    if isinstance(result, dict) and "access_token" in result:
+                        context = dict(
+                            user=user,
+                            # https://datatracker.ietf.org/doc/html/rfc6749#section-5.1
+                            access_token=result["access_token"],
+                            token_type=result.get("token_type", "Bearer"),
+                            expires_in=result.get("expires_in", 300),
+                            refresh_token=result.get("refresh_token"),
+                        )
+                        if result.get("scope"):
+                            context["scopes"] = result["scope"].split()
+                    else:
+                        pass  # Token request failed. So we set no context.
+                else:
+                    context = {"user": user}
+                if context:
+                    try:
+                        return function(request, *args, context=context, **kwargs)
+                    except TypeError:
+                        if scopes:
+                            raise
+                        warnings.warn(
+                            "The '@login_required(...)' decorated view should accept "
+                            "a keyword argument named 'context'. For example, "
+                            "def my_view(request, *, context): ...",
+                            DeprecationWarning)
+                        return function(request, *args, **kwargs)
+            # Save an http 302 by calling self.login(request) instead of redirect(self.login)
+            return self.login(
+                request,
+                next_link=request.get_full_path(),
+                scopes=scopes,
+                )
         return wrapper
 

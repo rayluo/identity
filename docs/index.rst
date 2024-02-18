@@ -73,8 +73,8 @@ Web app that logs in users
     from django.conf import settings
 
     @settings.AUTH.login_required
-    def index(request):
-        user = settings.AUTH.get_user(request)
+    def index(request, *, context):
+        user = context['user']
         ...
 
 All of the content above are demonstrated in
@@ -96,11 +96,10 @@ Building on top of the previous scenario, you just need to
    For example::
 
     @settings.AUTH.login_required(scopes=["your_scope"])
-    def call_api(request):
-        token = settings.AUTH.get_token_for_user(request, ["your_scope"])
+    def call_api(request, *, context):
         api_result = requests.get(  # Use access token to call downstream api
             "https://your_api.example.com",
-            headers={'Authorization': 'Bearer ' + token['access_token']},
+            headers={'Authorization': 'Bearer ' + context['access_token']},
             timeout=30,
         ).json()  # Here we assume the response format is json
         ...
