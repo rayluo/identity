@@ -20,8 +20,8 @@ This Identity library is an authentication/authorization library that:
 
 ## Scenarios supported
 
-* [Web app that logs in users](https://identity-library.readthedocs.io/en/latest/#web-app-that-logs-in-users)
-* [Web app that logs in users and calls a web API on their behalf](https://identity-library.readthedocs.io/en/latest/#web-app-that-logs-in-users-and-calls-a-web-api-on-their-behalf)
+* [Web app that logs in users](https://identity-library.readthedocs.io/en/latest/)
+* [Web app that logs in users and calls a web API on their behalf](https://identity-library.readthedocs.io/en/latest/)
 * [In roadmap] Protected web API that only authenticated users can access
 * [In roadmap] Protected web API that calls another (downstream) web API on behalf of the signed-in user
 
