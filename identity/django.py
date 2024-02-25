@@ -165,6 +165,10 @@ class Auth(object):
             )["auth_uri"] if self._reset_password_auth and self._redirect_view else None
 
     def get_edit_profile_url(self, request):
+        """A helper to get the URL for Microsoft Entra B2C's edit profile page.
+
+        You can pass this URL to your template and render it there.
+        """
         return self._edit_profile_auth.log_in(
             redirect_uri=request.build_absolute_uri(self._redirect_view),
             state=self._edit_profile_auth.__STATE_NO_OP,
@@ -176,13 +180,11 @@ class Auth(object):
         next_link:str = None,  # Obtain the next_link from the app developer,
             # NOT from query string which could become an open redirect vulnerability.
     ):
-        """The login view.
-
-        :param str next_link: The path to redirect to after login.
-
-        You can redirect to the login page from inside a view, by calling
-        ``return redirect(auth.login)``.
-        """
+        # The login view.
+        # App developer could redirect to the login page from inside a view,
+        # by calling ``return redirect(auth.login)``.
+        # But a better approach is to use the ``@login_required`` decorator
+        # which will implicitly call this login view when needed.
         if not (self._client_id and self._authority):
             return self._render_auth_error(
                 request,
@@ -225,10 +227,7 @@ class Auth(object):
             ))
 
     def auth_response(self, request):
-        """The auth_response view.
-
-        You should not need to call this view directly.
-        """
+        # The auth_response view. You should not need to call this view directly.
         result = self._build_auth(request).complete_log_in(request.GET)
         if "error" in result:
             return self._render_auth_error(
@@ -251,9 +250,29 @@ class Auth(object):
             self._build_auth(request).log_out(request.build_absolute_uri("/")))
 
     def get_user(self, request):
+        """Get the logged-in user of the request.
+
+        :param request: The request object of the current view.
+
+        :return:
+            The user object which is a dict of claims,
+            or None if the user is not logged in.
+        """
         return self._build_auth(request).get_user()
 
     def get_token_for_user(self, request, scopes: List[str]):
+        """Get access token for the current user, with specified scopes.
+
+        :param list scopes:
+            A list of scopes that your app will need to use.
+
+        :return: A dict representing the json response from identity provider.
+
+            - A successful response would contain "access_token" key,
+            - An error response would contain "error" and usually "error_description".
+
+            See also `OAuth2 specs <https://www.rfc-editor.org/rfc/rfc6749#section-5>`_.
+        """
         return self._build_auth(request).get_token_for_user(scopes)
 
     def login_required(
