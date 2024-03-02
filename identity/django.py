@@ -221,7 +221,7 @@ class Auth(object):
                 error=result["error"],
                 error_description=result.get("error_description"),
                 )
-        return redirect("index")  # TODO: Go back to a customizable url
+        return redirect("/")  # Use a relative URL rather than a hard-coded view name
 
     def logout(self, request):
         """The logout view.
