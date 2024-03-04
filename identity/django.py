@@ -59,15 +59,10 @@ class Auth(WebFrameworkAuth):
         # by calling ``return redirect(auth.login)``.
         # But a better approach is to use the ``@login_required`` decorator
         # which will implicitly call this login view when needed.
-        if not (self._client_id and self._authority):
+        config_error = self._get_configuration_error()
+        if config_error:
             return self._render_auth_error(
-                request,
-                error="configuration_error",
-                error_description="""Almost there. Did you forget to setup
-(1) authority, or the b2c_tenant_name and b2c_signup_signin_user_flow pair
-(2) client_id
-?""",
-                )
+                request, error="configuration_error", error_description=config_error)
         redirect_uri = request.build_absolute_uri(
             self._redirect_view) if self._redirect_view else None
         if redirect_uri != self._redirect_uri:

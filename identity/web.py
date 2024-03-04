@@ -23,8 +23,9 @@ class Auth(object):  # This a low level helper which is web framework agnostic
             self,
             *,
             session,
-            authority,
             client_id,
+            oidc_authority=None,
+            authority=None,
             client_credential=None,
             http_cache=None,
             ):
@@ -37,9 +38,18 @@ class Auth(object):  # This a low level helper which is web framework agnostic
             If you are using Flask, you should pass in ``session``.
             If you are using Django, you should pass in ``request.session``.
 
-        :param str authority:
-            The authority which your app registers with.
+        :param str oidc_authority:
+            The authority which your app registers with your OpenID Connect provider.
             For example, ``https://example.com/foo``.
+            This library will concatenate ``/.well-known/openid-configuration``
+            to form the metadata endpoint.
+
+        :param str authority:
+            The authority which your app registers with your Microsoft Entra ID.
+            For example, ``https://example.com/foo``.
+            Historically, the underlying library will *sometimes* automatically
+            append "/v2.0" to it.
+            If you do not want that behavior, you may use ``oidc_authority`` instead.
 
         :param str client_id:
             The client_id of your web app, issued by its authority.
@@ -49,6 +59,7 @@ class Auth(object):  # This a low level helper which is web framework agnostic
             The actual format is decided by the underlying auth library. TBD.
         """
         self._session = session
+        self._oidc_authority = oidc_authority
         self._authority = authority
         self._client_id = client_id
         self._client_credential = client_credential
@@ -70,6 +81,7 @@ class Auth(object):  # This a low level helper which is web framework agnostic
                 if client_credential else msal.PublicClientApplication)(
             self._client_id,
             client_credential=client_credential,
+            oidc_authority=self._oidc_authority,
             authority=self._authority,
             token_cache=cache,
             http_cache=self._http_cache,  # Share same http_cache among MSAL instances
@@ -262,7 +274,10 @@ class Auth(object):  # This a low level helper which is web framework agnostic
 
     @functools.lru_cache(maxsize=1)
     def _get_oidc_config(self):
-        return requests.get(f"{self._authority}/.well-known/openid-configuration").json()
+        # The self._authority is usually the V1 endpoint of Microsoft Entra ID,
+        # which is still good enough for log_out()
+        a = self._oidc_authority or self._authority
+        return requests.get(f"{a}/.well-known/openid-configuration").json()
 
     def log_out(self, homepage):
         # The vocabulary is "log out" (rather than "sign out") in the specs
@@ -326,6 +341,7 @@ class WebFrameworkAuth(ABC):  # This is a mid-level helper to be subclassed
         client_id: str,
         *,
         client_credential=None,
+        oidc_authority: str=None,
         authority: str=None,
         redirect_uri: str=None,
         # We end up accepting Microsoft Entra ID B2C parameters rather than generic urls
@@ -344,6 +360,19 @@ class WebFrameworkAuth(ABC):  # This is a mid-level helper to be subclassed
             It is somtimes a string.
             The actual format is decided by the underlying auth library. TBD.
 
+        :param str oidc_authority:
+            The authority which your app registers with your OpenID Connect provider.
+            For example, ``https://example.com/foo``.
+            This library will concatenate ``/.well-known/openid-configuration``
+            to form the metadata endpoint.
+
+        :param str authority:
+            The authority which your app registers with your Microsoft Entra ID.
+            For example, ``https://example.com/foo``.
+            Historically, the underlying library will *sometimes* automatically
+            append "/v2.0" to it.
+            If you do not want that behavior, you may use ``oidc_authority`` instead.
+
         :param str redirect_uri:
             This will be used to mount your project's auth views accordingly.
 
@@ -351,11 +380,6 @@ class WebFrameworkAuth(ABC):  # This is a mid-level helper to be subclassed
             then your project's redirect page will be mounted at "/x/y/z/redirect",
             login page will be at "/x/y/z/login",
             and logout page will be at "/x/y/z/logout".
-
-        :param str authority:
-            The authority which your application registers with.
-            For example, ``https://example.com/foo``.
-            This is a required parameter unless you the following B2C parameters.
 
         :param str b2c_tenant_name:
             The tenant name of your Microsoft Entra ID tenant, such as "contoso".
@@ -414,16 +438,24 @@ class WebFrameworkAuth(ABC):  # This is a mid-level helper to be subclassed
             self._authority = authority
             self._edit_profile_auth = None
             self._reset_password_auth = None
-        if not self._authority:
-            logger.error(  # Do not raise exception, because
-                # we want to render a nice error page later during login,
-                # which is a better developer experience especially for deployment
-                "Either authority or b2c_tenant_name and b2c_signup_signin_user_flow "
-                "must be provided")
+        self._oidc_authority = oidc_authority
+
+    def _get_configuration_error(self):
+        # Do not raise exception, because
+        # we want to render a nice error page later during login,
+        # which is a better developer experience especially for deployment
+        if not (self._client_id and (self._oidc_authority or self._authority)):
+            return """Almost there. Did you forget to setup at least these settings?
+(1) CLIENT_ID, and either
+(2.1) OIDC_AUTHORITY, or
+(2.2) AUTHORITY, or
+(2.3) the B2C_TENANT_NAME and SIGNUPSIGNIN_USER_FLOW pair?
+"""
 
     def _build_auth(self, session):
         return Auth(
             session=session,
+            oidc_authority=self._oidc_authority,
             authority=self._authority,
             client_id=self._client_id,
             client_credential=self._client_credential,
