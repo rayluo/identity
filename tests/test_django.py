@@ -17,6 +17,6 @@ def test_configuration_errors_should_be_delivered_to_log_in():
     auth = Auth(None)  # No exception raised
     with mock.patch.object(auth, "_render_auth_error") as mock_render_auth_error:
         auth.login(object())
-        assert mock_render_auth_error.called_once_with(
+        mock_render_auth_error.assert_called_once_with(
             mock.ANY, error="configuration_error", error_description=mock.ANY)
 
