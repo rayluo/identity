@@ -40,7 +40,7 @@ class Auth(WebFrameworkAuth):
         self.urlpattern = path(route, include([
             # Note: path(..., view, ...) does not accept classmethod
             path('login', self.login),
-            path('logout', self.logout, name=f"{__name__}.logout"),
+            path('logout', self.logout, name=f"identity.logout"),
             path(
                 self._redirect_view or 'auth_response',  # The latter is used by device code flow
                 self.auth_response,
@@ -87,7 +87,7 @@ class Auth(WebFrameworkAuth):
             auth_response_url=reverse(self.auth_response),
             ))
 
-    def _render_auth_error(self, request, error, error_description=None):
+    def _render_auth_error(self, request, *, error, error_description=None):
         return render(request, "identity/auth_error.html", dict(
             # Use flat data types so that the template can be as simple as possible
             error=error,

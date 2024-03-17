@@ -1,7 +1,7 @@
 .. tip::
 
     We recommend
-    `storing settings in environment variables. <https://12factor.net/config>`_.
+    `storing settings in environment variables <https://12factor.net/config>`_.
     The snippet above read data from environment variables.
 
 ..
