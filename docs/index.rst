@@ -45,6 +45,8 @@ This Identity library is a Python authentication/authorization library that:
    :hidden:
 
    django
+   flask
+   abc
    generic
 
 .. note::

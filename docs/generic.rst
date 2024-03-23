@@ -1,6 +1,10 @@
 Low-level API for generic web projects
 ======================================
 
+This is low-level API for web projects.
+It is documented here only for reference. You do not need to use it directly.
+Use the high-level API for your Django or Flask web framework instead.
+
 Web app that logs in users
 --------------------------
 
