@@ -23,11 +23,13 @@ This Identity library is a Python authentication/authorization library that:
   `Microsoft's MSAL Python library <https://github.com/AzureAD/microsoft-authentication-library-for-python>`_
   and tailored for web apps.
 
-  - Currently providing a high level API for
+  - a high level API for
     `Django web framework <https://www.djangoproject.com/>`_,
+  - a high level API for
+    `Flask web framework <https://flask.palletsprojects.com/en/3.0.x/>`_,
   - and a low level API which would likely work for any Python web framework.
 
-* Currently supports these features/scenarios:
+* Supports these features/scenarios:
 
   - Sign-in/sign-out
 
@@ -35,7 +37,7 @@ This Identity library is a Python authentication/authorization library that:
 
   - Acquires an access token to call a web API
 
-    + Step-up consent. If the user needs to consent to more permissions,
+    + Incremental consent. If the user needs to consent to more permissions,
       the library will automatically redirect the user to the consent page.
     + Automatically cache the access token and renew it when needed
 
