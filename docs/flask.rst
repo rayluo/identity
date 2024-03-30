@@ -8,8 +8,10 @@ Create `a hello world web project in Flask <https://flask.palletsprojects.com/en
 Here we assume the project's main file is named ``app.py``.
 
 
-Flask configuration
--------------------
+Identity-for-Flask configuration
+--------------------------------
+
+#. Install dependency by ``pip install identity[flask]``
 
 #. Add an ``app_config.py`` file containing the following::
 

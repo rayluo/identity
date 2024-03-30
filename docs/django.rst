@@ -22,10 +22,12 @@ as a reference. What we need are basically these steps:
     def index(request):
         return HttpResponse("Hello, world. Everyone can read this line.")
 
-Django configuration
---------------------
+Identity-for-Django configuration
+---------------------------------
 
-#. Firstly, create an instance of the :py:class:`identity.django.Auth` object,
+#. Install dependency by ``pip install identity[django]``
+
+#. Create an instance of the :py:class:`identity.django.Auth` object,
    and assign it to a global variable inside your ``settings.py``::
 
     import os
