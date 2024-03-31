@@ -1,3 +1,15 @@
 furo
 sphinx-paramlinks
+
+# The code base has conditional dependencies,
+# so that app developers only need to install their chosen web framework.
+# However, for sphinx to work, ALL web frameworks must be available.
+#
+# The following two somehow failed with this error on ReadTheDocs
+# ERROR: Directory '..[django]' is not installable. Neither 'setup.py' nor 'pyproject.toml' found.
+#..[django]
+#..[flask]
+#
+# So, we stick with the following approach that works.
 -r ../requirements.txt
+

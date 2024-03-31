@@ -1,5 +1,5 @@
-.
+# The code base has conditional dependencies,
+# but this ./requirements.txt is referenced by docs/requirements.txt
+# which must have ALL dependencies for the docs to be built.
+-e .[all_for_docs]
 
-# Since we currently still supports Python 3.7, we choose Django version accordingly.
-# See https://docs.djangoproject.com/en/5.0/faq/install/#what-python-version-can-i-use-with-django
-django>=3.2,<6
