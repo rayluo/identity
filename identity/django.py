@@ -6,8 +6,9 @@ from urllib.parse import urlparse
 
 from django.shortcuts import redirect, render
 from django.urls import include, path, reverse
+from django.http import HttpResponse
 
-from .web import WebFrameworkAuth
+from .web import WebFrameworkAuth, HttpError, ApiAuth as _ApiAuth
 
 
 logger = logging.getLogger(__name__)
@@ -188,4 +189,19 @@ class Auth(WebFrameworkAuth):
                 scopes=scopes,
                 )
         return wrapper
+
+
+class ApiAuth(_ApiAuth):
+    def authorization_required(self, *, expected_scopes, **kwargs):
+        def decorator(function):
+            @wraps(function)
+            def wrapper(request, *args, **kwargs):
+                try:
+                    context = self._validate(request, expected_scopes=expected_scopes)
+                except HttpError as e:
+                    return HttpResponse(
+                        e.description, status=e.status_code, headers=e.headers)
+                return function(request, *args, context=context, **kwargs)
+            return wrapper
+        return decorator
 

@@ -1,5 +1,7 @@
-Identity for Flask
-==================
+Identity for a Flask Web App
+============================
+
+.. include:: app-vs-api.rst
 
 Prerequisite
 ------------
@@ -8,8 +10,8 @@ Create `a hello world web project in Flask <https://flask.palletsprojects.com/en
 Here we assume the project's main file is named ``app.py``.
 
 
-Identity-for-Flask configuration
---------------------------------
+Configuration
+-------------
 
 #. Install dependency by ``pip install identity[flask]``
 
