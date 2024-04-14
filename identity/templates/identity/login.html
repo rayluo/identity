@@ -1,13 +1,26 @@
 <!DOCTYPE html>
-{# The template uses only a common subset of Django and Flask syntax. #}
+{# The default template uses only a common subset of Django and Flask syntax. #}
 {# See also https://jinja.palletsprojects.com/en/latest/switching/#django #}
+{# But, your project probably runs on a specific web framework exclusively, #}
+{# so, your customized template may use all syntax of your chosen framework. #}
+
+<!--
+    You can customize this template by
+    copying https://github.com/rayluo/identity/blob/dev/identity/templates/identity/login.html
+    into your_project_root/templates/identity/login.html
+    and then modifying it.
+
+    This approach has been tested with these frameworks:
+    Django, Flask.
+-->
 <html lang="en">
+{% if user_code or reset_password_url %}
   <head>
     <meta charset="UTF-8">
-    <title>Login</title>
+    <title>Sign In</title>
   </head>
   <body>
-    <h1>Login</h1>
+    <h1>Sign In</h1>
 
     {% if user_code %}
     <ol>
@@ -26,5 +39,11 @@
     <a href='{{ reset_password_url }}'>Reset Password</a>
     {% endif %}
   </body>
+{% else %}
+  <!-- This shortcut reduces the need to customize this template -->
+  <head>
+    <meta http-equiv='refresh' content='0; URL={{ auth_uri }}'>
+  </head>
+{% endif %}
 </html>
 

@@ -94,6 +94,18 @@ In roadmap.
   </tr>
 
   <tr>
+    <th>How to customize the login page</th>
+    <td colspan=4>
+
+The default login page will typically redirect users to your Identity Provider,
+so you don't have to customize it.
+But if the default login page is shown in your browser,
+you can read its HTML source code, and find the how-to instructions there.
+
+</td>
+  </tr>
+
+  <tr>
     <th>How to build the samples above from scratch</th>
     <td colspan=4>
 
