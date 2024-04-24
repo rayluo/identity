@@ -1,5 +1,7 @@
-Identity for Django
-===================
+Identity for a Django Web App
+=============================
+
+.. include:: app-vs-api.rst
 
 Prerequisite
 ------------
@@ -15,15 +17,15 @@ as a reference. What we need are basically these steps:
 #. ``python manage.py runserver localhost:5000``
    You must use a port matching your redirect_uri that you registered.
 
-#. Now, add an `index` view to your project.
+#. Now, add a new `mysite/views.py` file with an `index` view to your project.
    For now, it can simply return a "hello world" page to any visitor::
 
     from django.http import HttpResponse
     def index(request):
         return HttpResponse("Hello, world. Everyone can read this line.")
 
-Identity-for-Django configuration
----------------------------------
+Configuration
+-------------
 
 #. Install dependency by ``pip install identity[django]``
 

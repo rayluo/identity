@@ -1,14 +1,37 @@
 from abc import ABC, abstractmethod
 import functools
+import json
 import logging
 import time
-from typing import List  # Needed in Python 3.7 & 3.8
+from typing import (
+    List, Dict, Callable,  # Needed in Python 3.7 & 3.8
+    Union,  # Needed until Python 3.10+
+)
 
+import jwt  # PyJWT
 import requests
 import msal
 
 
 logger = logging.getLogger(__name__)
+
+
+def _get_http_client():  # Better reuse the result of this function to save resources
+    http_client = requests.Session()
+    a = requests.adapters.HTTPAdapter(
+        # Web app/API shall use minimal retry;
+        # let the calling client decide their own retry strategy
+        max_retries=1)
+    http_client.mount("http://", a)
+    http_client.mount("https://", a)
+    return http_client
+
+@functools.lru_cache(maxsize=128)
+def __http_get_json(http_client, url, timestamp):
+    return http_client.get(url).json()
+
+def _http_get_json(url, *, http_client):  # Get JSON from a URL or a one-day cache
+    return __http_get_json(http_client, url, time.strftime("%x"))
 
 
 class Auth(object):  # This a low level helper which is web framework agnostic
@@ -64,6 +87,7 @@ class Auth(object):  # This a low level helper which is web framework agnostic
         self._client_id = client_id
         self._client_credential = client_credential
         self._http_cache = {} if http_cache is None else http_cache   # All subsequent MSAL instances will share this
+        self._http_client = _get_http_client()
 
     def _load_cache(self):
         cache = msal.SerializableTokenCache()
@@ -272,13 +296,6 @@ class Auth(object):  # This a low level helper which is web framework agnostic
                 return result
         return {"error": "interaction_required", "error_description": "Cache missed"}
 
-    @functools.lru_cache(maxsize=1)
-    def _get_oidc_config(self):
-        # The self._authority is usually the V1 endpoint of Microsoft Entra ID,
-        # which is still good enough for log_out()
-        a = self._oidc_authority or self._authority
-        return requests.get(f"{a}/.well-known/openid-configuration").json()
-
     def log_out(self, homepage):
         # The vocabulary is "log out" (rather than "sign out") in the specs
         # https://openid.net/specs/openid-connect-frontchannel-1_0.html
@@ -295,9 +312,14 @@ class Auth(object):  # This a low level helper which is web framework agnostic
         self._session.pop(self._USER, None)  # Must
         self._session.pop(self._TOKEN_CACHE, None)  # Optional
         try:
-            # Empirically, Microsoft Entra ID's /v2.0 endpoint shows an account picker
-            # but its default (i.e. v1.0) endpoint will sign out the (only?) account
-            e = self._get_oidc_config().get("end_session_endpoint")
+            # The self._authority ends up w/ the V1 endpoint of Microsoft Entra ID,
+            # which is still good enough for log_out()
+            a = self._oidc_authority or self._authority
+            e = _http_get_json(
+                # Empirically, Microsoft Entra ID /v2 endpoint shows an account picker
+                # but its default (i.e. v1) endpoint will sign out the (only?) account
+                f"{a}/.well-known/openid-configuration",
+                http_client=self._http_client).get("end_session_endpoint")
         except requests.exceptions.RequestException as e:
             logger.exception("Failed to get OIDC config")
             return homepage
@@ -512,3 +534,231 @@ class WebFrameworkAuth(ABC):  # This is a mid-level helper to be subclassed
         # The default auth_error.html template may or may not escape.
         # If a web framework does not escape it by default, a subclass shall escape it.
         pass
+
+
+class HttpError(Exception):
+    def __init__(self, status_code, *, headers, description=None):
+        self.status_code = status_code
+        self.headers = headers
+        self.description = description
+
+
+class ApiAuth(ABC):  # Unlike Auth, this does not use session
+    _INVALID_REQUEST = "invalid_request"
+    _INVALID_TOKEN = "invalid_token"
+    _INSUFFICIENT_SCOPE = "insufficient_scope"
+
+    def __init__(
+        self,
+        *,
+        client_id,
+        oidc_authority=None,
+        authority=None,
+        client_credential=None,
+    ):
+        """Create an ApiAuth instance for a web API.
+
+        This instance is expected to be long-lived with the web app.
+
+        :param str oidc_authority:
+            The authority which your app registers with your OpenID Connect provider.
+            For example, ``https://example.com/foo``.
+            This library will concatenate ``/.well-known/openid-configuration``
+            to form the metadata endpoint.
+
+        :param str authority:
+            The authority which your app registers with your Microsoft Entra ID.
+            For example, ``https://example.com/foo``.
+            Historically, the underlying library will *sometimes* automatically
+            append "/v2.0" to it.
+            If you do not want that behavior, you may use ``oidc_authority`` instead.
+
+        :param str client_id:
+            The client_id of your web app, issued by its authority.
+
+        :param str client_credential:
+            It is somtimes a string.
+            The actual format is decided by the underlying auth library. TBD.
+        """
+        self._client_id = client_id
+        self._client_credential = client_credential
+        self._oidc_authority = oidc_authority
+        self._authority = authority
+        self._realm = oidc_authority or authority
+        self._http_client = _get_http_client()
+
+    def raise_http_error(self, status_code, *, headers=None, description=None):
+        # This can be overridden by a subclass for each web framework.
+        # If a web framework (Django) does not have a way to raise an HTTP error,
+        # its subclass or app must catch HttpError and render a response accordingly.
+        raise HttpError(status_code, headers=headers, description=description)
+
+    def __raise_oauth2_error(
+        self,
+        error_code:str,
+        *,
+        error_description:str = None,
+        error_uri:str = None,
+        scopes:List[str] = None,
+    ):
+        # https://datatracker.ietf.org/doc/html/rfc6750#section-3
+        auth_params = ", ".join(
+            '{k}: "{v}"'.format(k=k, v=v.replace('"', "'")) for k, v in dict(
+                realm=self._realm,
+                error=error_code,
+                error_description=error_description,
+                error_uri=error_uri,
+                scope=' '.join(scopes) if scopes else None,
+            ).items() if v and isinstance(v, str))
+        self.raise_http_error(
+            {  # https://datatracker.ietf.org/doc/html/rfc6750#section-3.1
+                self._INVALID_REQUEST: 400,
+                self._INVALID_TOKEN: 401,
+                self._INSUFFICIENT_SCOPE: 403,
+            }.get(error_code, 400),
+            headers={"WWW-Authenticate": f'Bearer {auth_params}'},
+            description=f"{error_code}: {error_description}",
+            )
+
+    def _oidc_discovery(self):
+        idp = self._oidc_authority or f"{self._authority}/v2.0"  # Matching MSAL behavior
+        oidc_discovery = f"{idp}/.well-known/openid-configuration"
+        logger.debug("OIDC Discovery from %s (probably via cache)", oidc_discovery)
+        return _http_get_json(oidc_discovery, http_client=self._http_client)
+
+    @functools.lru_cache(maxsize=128)
+    def __get_keys(self, timestamp):
+        # Returns the keys from the authority's jwks_uri, remap to {kid: PyJWT's key}
+        if not (self._oidc_authority or self._authority):
+            self.raise_http_error(  # So the API errors out gracefully
+                500, description="No authority to fetch keys from")
+        idp = self._oidc_authority or f"{self._authority}/v2.0"  # Matching MSAL behavior
+        try:
+            conf = self._oidc_discovery()
+            try:
+                return {
+                    jwk["kid"]: dict(  # Empirically, kid always exists in the wild
+                        jwk,  # https://www.rfc-editor.org/rfc/rfc7517.html#section-4.5
+                        # Inspired from https://stackoverflow.com/a/68891371/728675
+                        pyjwt_key=jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk)),
+                    ) for jwk in _http_get_json(
+                        conf["jwks_uri"], http_client=self._http_client)["keys"]
+                }
+            except KeyError as e:
+                self.raise_http_error(500, description=f'Key should have "kid": {e}')
+        except requests.exceptions.RequestException as e:
+            self.raise_http_error(500, description=f"Failed to get keys: {e}")
+
+    def _get_keys(self):
+        return self.__get_keys(time.strftime("%x"))  # Refresh keys daily
+
+    def _validate_bearer_token(
+        self,
+        token:str, *,
+        scopes:Union[List[str], Dict[str, str]],
+    ):
+        # Return claims of the JWT if valid, otherwise calls __raise_oauth2_error()
+        try:
+            kid = jwt.get_unverified_header(token)["kid"]
+            key = self._get_keys().get(kid)
+            if not key:
+                self.__raise_oauth2_error(
+                    self._INVALID_TOKEN,
+                    error_description=f"Key not found for kid {kid}")
+            claims = jwt.decode(
+                token,
+                key["pyjwt_key"],
+                algorithms=["RS256"],  # Hardcode it to prevent downgrade attack
+                audience=self._client_id,
+                )  # https://pyjwt.readthedocs.io/en/stable/api.html#jwt.decode
+
+            expected_scopes = set(scopes or [])
+            authorized_scopes = set(claims.get("scp", "").split())
+            if expected_scopes - authorized_scopes:
+                # TODO: It could also be daemon app. Need to support actor validation
+                # https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation#validate-the-actor
+                self.__raise_oauth2_error(
+                    self._INSUFFICIENT_SCOPE,
+                    error_description="Insufficient scope(s). "
+                        f'''This API expects "{' '.join(expected_scopes)}", '''
+                        f'''but got only "{' '.join(authorized_scopes)}".''',
+                    # scopes can be a dict of {"scope_in_scp": "scope in request"}
+                    scopes=scopes.values() if isinstance(scopes, dict) else scopes)
+
+            # https://learn.microsoft.com/en-us/entra/identity-platform/access-tokens#recap
+            expected_issuer = key.get("issuer") or self._oidc_discovery()["issuer"]
+            if self._authority and "tid" in claims:  # Microsoft Entra ID code path
+                expected_issuer = expected_issuer.replace("{tenantid}", claims["tid"])
+            if claims.get("iss") != expected_issuer:
+                self.__raise_oauth2_error(
+                    self._INVALID_TOKEN, error_description="Issuer mismatch. "
+                        f"(Expected {expected_issuer}, got {claims.get('iss')})")
+            return claims
+
+        except (
+            jwt.DecodeError, jwt.InvalidSignatureError, jwt.InvalidAudienceError,
+        ) as e:
+            self.__raise_oauth2_error(self._INVALID_TOKEN, error_description=f"{e}")
+
+    def _validate(
+        self,
+        request,  # We expect request.headers to be a dict-like object
+        *,
+        expected_scopes,  # Defined in _validate_bearer_token(),
+            # documented in authorization_required()
+    ):
+        authz = request.headers.get("Authorization")
+        # https://datatracker.ietf.org/doc/html/rfc6750#section-3
+        if not authz:
+            self.raise_http_error(
+                401,  # https://stackoverflow.com/a/6937030/728675
+                headers={"WWW-Authenticate": f'Bearer realm="{self._realm}"'},
+                description="Authorization header is missing",
+            )
+        authz_parts = authz.split(maxsplit=1)
+        scheme = authz_parts[0]
+        params = authz_parts[1:]  # May be an empty list
+        if scheme == "Bearer" and params:
+            context = {
+                "claims":  # TODO: Decide on the name
+                    self._validate_bearer_token(
+                        params[0], scopes=expected_scopes),
+                }
+        # TODO: Support more schemes
+        else:
+            self.raise_http_error(
+                401,
+                headers={"WWW-Authenticate": f'Bearer realm="{self._realm}"'},
+                description=f"Authorization header is invalid. ({authz})",
+            )
+        return context
+
+    @abstractmethod
+    def authorization_required(  # Lengthy but precise name
+        self,
+        *,
+        expected_scopes:List[str],  # TODO: Accept a callable in RESTful API scenario?
+        #extra_scopes: List[str]=None,  # TODO: For OBO
+    ):
+        # Sub-classes inherit the docstring, so we only document the commen params.
+        """It returns a decorator that verifies the request's authorization header.
+
+        A request not meeting the requirement(s) will raise an HTTP 401 Unauthorized.
+        For a valid request, the view will be called with a keyword argument
+        named "context" which is a dict containing the user object.
+
+        Usage::
+
+            @settings.AUTH.authorization_required(expected_scopes=["foo", "bar"])
+            def resource(..., *, context):  # The ... part is differnt per web framework
+                # The user is uniquely identified by claims['sub'] or claims["oid"],
+                # claims['tid'] and/or claims['iss'].
+                claims = context["claims"]
+                return {"content": f"content for {claims['sub']}@{claims['tid']}"}
+
+        :param expected_scopes:
+            These scopes are expected to be present in the token's "scp" claim.
+            If not, the view will emit an HTTP 401 Unauthorized or HTTP 403 Forbidden.
+        """
+        raise NotImplementedError("Subclass must implement this method")
+

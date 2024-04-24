@@ -6,11 +6,12 @@ from urllib.parse import urlparse
 
 from flask import (
     Blueprint, Flask,
+    abort, make_response,  # Used in ApiAuth
     redirect, render_template, request, session, url_for,
 )
 from flask_session import Session
 
-from .web import WebFrameworkAuth
+from .web import WebFrameworkAuth, ApiAuth as _ApiAuth
 
 
 logger = logging.getLogger(__name__)
@@ -154,4 +155,20 @@ class Auth(WebFrameworkAuth):
                 scopes=scopes,
                 )
         return wrapper
+
+
+class ApiAuth(_ApiAuth):
+    def raise_http_error(self, status_code, *, headers=None, description=None):
+        response = make_response(description, status_code)
+        response.headers.extend(headers or {})
+        abort(response)
+
+    def authorization_required(self, *, expected_scopes, **kwargs):
+        def decorator(function):
+            @wraps(function)
+            def wrapper(*args, **kwargs):
+                context = self._validate(request, expected_scopes=expected_scopes)
+                return function(*args, context=context, **kwargs)
+            return wrapper
+        return decorator
 

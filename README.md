@@ -70,7 +70,7 @@ By using this library, it will automatically renew signed-in session when the ID
   </tr>
 
   <tr>
-    <th>Web App Calls a web API</th>
+    <th>Your Web App Calls a Web API on behalf of the user</th>
     <td colspan=4>
 
 This library supports:
@@ -85,7 +85,22 @@ They are demonstrated by the same samples above.
   </tr>
 
   <tr>
-    <th>Web API Calls another web API (On-behalf-of)</th>
+    <th>Your Web API protected by an access token</th>
+    <td colspan=4>
+
+By using this library, it will automatically emit
+HTTP 401 or 403 error when the access token is absent or invalid.
+
+* Sample written in ![Django](https://raw.githubusercontent.com/rayluo/identity/dev/docs/django.webp)(Coming soon)
+* [Sample written in ![Flask](https://raw.githubusercontent.com/rayluo/identity/dev/docs/flask.webp)](https://github.com/rayluo/python-webapi-flask.git)
+* Need support for more web frameworks?
+  [Upvote existing feature request or create a new one](https://github.com/rayluo/identity/issues)
+
+</td>
+  </tr>
+
+  <tr>
+    <th>Your Web API Calls another web API on behalf of the user (OBO)</th>
     <td colspan=4>
 
 In roadmap.
