@@ -73,19 +73,19 @@ Web app that logs in users and calls a web API on their behalf
 
 #. Decorate your token-consuming views using the same
    :py:func:`identity.flask.Auth.login_required` decorator,
-   this time  with a parameter ``scopes=["your_scope_1", "your_scope_2"]``.
+   this time with a parameter ``scopes=["your_scope_1", "your_scope_2"]``.
 
    Then, inside your view, the token will be readily available via
    ``context['access_token']``. For example::
 
     @app.route("/call_api")
-    @auth.login_required(scopes=os.getenv("SCOPE", "").split())
+    @auth.login_required(scopes=["your_scope_1", "your_scope_2"])
     def call_api(*, context):
         api_result = requests.get(  # Use access token to call a web api
             "https://your_api.example.com",
             headers={'Authorization': 'Bearer ' + context['access_token']},
             timeout=30,
-        ).json()  # Here we assume the response format is json
+        )
         ...
 
 All of the content above are demonstrated in

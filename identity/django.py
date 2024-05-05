@@ -154,7 +154,7 @@ class Auth(WebFrameworkAuth):
                         "https://example.com/endpoint",
                         headers={'Authorization': 'Bearer ' + context['access_token']},
                         timeout=30,
-                    ).json()  # Here we assume the response format is json
+                    )
                     ...
         """
         # With or without brackets. Inspired by https://stackoverflow.com/a/39335652/728675

@@ -38,7 +38,6 @@ class Auth(WebFrameworkAuth):
         # Manually register the routes, since we cannot use @app or @bp on methods
         if self._redirect_uri:
             redirect_path = urlparse(self._redirect_uri).path
-            #bp.route(redirect_path or "/auth_response")(self.auth_response)
             bp.route(redirect_path)(self.auth_response)
             bp.route(
                 f"{os.path.dirname(redirect_path)}/logout"  # Use it in template by url_for("identity.logout")
@@ -107,12 +106,14 @@ class Auth(WebFrameworkAuth):
 
         Usage::
 
-            @settings.AUTH.login_required
-            def my_view(request, *, context):
-                return render(request, 'index.html', dict(
+            @app.route("/")
+            @auth.login_required
+            def index(*, context):
+                return render_template(
+                    'index.html',
                     user=context["user"],  # User is guaranteed to be present
                         # because we decorated this view with @login_required
-                    ))
+                )
 
         :param list[str] scopes:
             A list of scopes that your app will need to use.
@@ -121,13 +122,14 @@ class Auth(WebFrameworkAuth):
 
             Usage::
 
-                @settings.AUTH.login_required(scopes=["scope1", "scope2"])
-                def my_view2(request, *, context):
+                @app.route("/call_api")
+                @auth.login_required(scopes=["scope1", "scope2"])
+                def call_an_api(*, context):
                     api_result = requests.get(  # Use access token to call an api
                         "https://example.com/endpoint",
                         headers={'Authorization': 'Bearer ' + context['access_token']},
                         timeout=30,
-                    ).json()  # Here we assume the response format is json
+                    )
                     ...
         """
         # With or without brackets. Inspired by https://stackoverflow.com/a/39335652/728675
