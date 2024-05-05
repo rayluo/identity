@@ -63,8 +63,21 @@ By using this library, it will automatically renew signed-in session when the ID
 
 * [Sample written in ![Django](https://raw.githubusercontent.com/rayluo/identity/dev/docs/django.webp)](https://github.com/Azure-Samples/ms-identity-python-webapp-django)
 * [Sample written in ![Flask](https://raw.githubusercontent.com/rayluo/identity/dev/docs/flask.webp)](https://github.com/Azure-Samples/ms-identity-python-webapp)
+* [Sample written in ![Quart](https://raw.githubusercontent.com/rayluo/identity/dev/docs/quart.webp)](https://github.com/rayluo/python-webapp-quart)
 * Need support for more web frameworks?
   [Upvote existing feature request or create a new one](https://github.com/rayluo/identity/issues)
+
+</td>
+  </tr>
+
+  <tr>
+    <th>How to customize the login page</th>
+    <td colspan=4>
+
+The default login page will typically redirect users to your Identity Provider,
+so you don't have to customize it.
+But if the default login page is shown in your browser,
+you can read its HTML source code, and find the how-to instructions there.
 
 </td>
   </tr>
@@ -89,18 +102,6 @@ They are demonstrated by the same samples above.
     <td colspan=4>
 
 In roadmap.
-
-</td>
-  </tr>
-
-  <tr>
-    <th>How to customize the login page</th>
-    <td colspan=4>
-
-The default login page will typically redirect users to your Identity Provider,
-so you don't have to customize it.
-But if the default login page is shown in your browser,
-you can read its HTML source code, and find the how-to instructions there.
 
 </td>
   </tr>
@@ -134,6 +135,7 @@ Choose the package declaration that matches your web framework:
 
 * Django: `pip install identity[django]`
 * Flask: `pip install identity[flask]`
+* Quart: `pip install identity[quart]`
 
 ## Versions
 

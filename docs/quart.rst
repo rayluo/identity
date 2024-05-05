@@ -35,20 +35,20 @@ Configuration
 
 
 #. Setup session management with the `Quart-session <https://github.com/kroketio/quart-session>`_ package, which currently supports either Redis or MongoDB backing stores. To use Redis as the session store, you should first install the package with the extra dependency::
-    
+
     pip install quart-session[redis]
 
 #. Then add configuration to ``app.py`` pointing to your Redis instance::
 
     app.config['SESSION_TYPE'] = 'redis'
     app.config['SESSION_URI'] = 'redis://localhost:6379'
-    
+
 
 Sign In and Sign Out
 ----------------------------------
 
 #. In your web project's ``app.py``, decorate some views with the
-   :py:func:`identity.flask.Auth.login_required` decorator.
+   :py:func:`identity.quart.Auth.login_required` decorator.
    It will automatically trigger sign-in. ::
 
     @app.route("/")
@@ -61,6 +61,31 @@ Sign In and Sign Out
    add this URL to present the logout link::
 
     <a href="{{ url_for('identity.logout') }}">Logout</a>
+
+
+Web app that logs in users and calls a web API on their behalf
+--------------------------------------------------------------
+
+#. Decorate your token-consuming views using the same
+   :py:func:`identity.quart.Auth.login_required` decorator,
+   this time with a parameter ``scopes=["your_scope_1", "your_scope_2"]``.
+
+   Then, inside your view, the token will be readily available via
+   ``context['access_token']``. For example::
+
+    @app.route("/call_api")
+    @auth.login_required(scopes=["your_scope_1", "your_scope_2"])
+    async def call_api(*, context):
+        async with httpx.AsyncClient() as client:
+            api_result = await client.get(  # Use access token to call a web api
+                os.getenv("ENDPOINT"),
+                headers={'Authorization': 'Bearer ' + context['access_token']},
+            )
+        return await render_template('display.html', result=api_result)
+
+
+All of the content above are demonstrated in
+`this Quart web app sample <https://github.com/rayluo/python-webapp-quart>`_.
 
 
 API reference
