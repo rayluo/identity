@@ -50,18 +50,18 @@ class Auth(WebFrameworkAuth):
         # "Don’t do self.app = app", see https://flask.palletsprojects.com/en/3.0.x/extensiondev/#the-extension-class-and-initialization
         self._auth = self._build_auth(session)
 
-    def _render_auth_error(self, *, error, error_description=None):
-        return render_template(
+    async def _render_auth_error(self, *, error, error_description=None):
+        return await render_template(
             f"{self._endpoint_prefix}/auth_error.html",
             error=error,
             error_description=error_description,
             reset_password_url=self._get_reset_password_url(),
             )
 
-    def login(self, *, next_link: str=None, scopes: List[str]=None):
+    async def login(self, *, next_link: str=None, scopes: List[str]=None):
         config_error = self._get_configuration_error()
         if config_error:
-            return self._render_auth_error(
+            return await self._render_auth_error(
                 error="configuration_error", error_description=config_error)
         log_in_result = self._auth.log_in(
             scopes=scopes,  # Have user consent to scopes (if any) during log-in
@@ -69,20 +69,20 @@ class Auth(WebFrameworkAuth):
             prompt="select_account",  # Optional. More values defined in  https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
             )
         if "error" in log_in_result:
-            return self._render_auth_error(
+            return await self._render_auth_error(
                 error=log_in_result["error"],
                 error_description=log_in_result.get("error_description"),
                 )
-        return render_template("identity/login.html", **dict(
+        return await render_template("identity/login.html", **dict(
             log_in_result,
             reset_password_url=self._get_reset_password_url(),
             auth_response_url=url_for(f"{self._endpoint_prefix}.auth_response"),
             ))
 
-    def auth_response(self):
+    async def auth_response(self):
         result = self._auth.complete_log_in(request.args)
         if "error" in result:
-            return self._render_auth_error(
+            return await self._render_auth_error(
                 error=result["error"],
                 error_description=result.get("error_description"),
                 )
@@ -142,14 +142,14 @@ class Auth(WebFrameworkAuth):
 
         # Called without brackets, i.e. @login_required
         @wraps(function)
-        def wrapper(*args, **kwargs):
+        async def wrapper(*args, **kwargs):
             auth = self._auth  # In Flask, the entire app uses a singleton _auth
             user = auth.get_user()
             context = self._login_required(auth, user, scopes)
             if context:
-                return function(*args, context=context, **kwargs)
+                return await function(*args, context=context, **kwargs)
             # Save an http 302 by calling self.login(request) instead of redirect(self.login)
-            return self.login(
+            return await self.login(
                 next_link=request.path,  # https://flask.palletsprojects.com/en/3.0.x/api/#flask.Request.path
                 scopes=scopes,
                 )
