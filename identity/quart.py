@@ -66,6 +66,7 @@ class Auth(WebFrameworkAuth):
             scopes=scopes,  # Have user consent to scopes (if any) during log-in
             redirect_uri=self._redirect_uri,
             prompt="select_account",  # Optional. More values defined in  https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
+            next_link=next_link,
             )
         if "error" in log_in_result:
             return await self._render_auth_error(
