@@ -34,7 +34,7 @@ Configuration
    .. include:: auth.rst
 
 
-#. Add configuration to your ``app.py`` for `Quart-session <https://github.com/kroketio/quart-session>`, a package which is automatically installed when you install ``identity[quart]``::
+#. Add configuration to your ``app.py`` for `Quart-session <https://github.com/kroketio/quart-session>`_, a package which is automatically installed when you install ``identity[quart]``::
 
     app.config['SESSION_TYPE'] = 'redis'
     # Point this to your Redis instance
