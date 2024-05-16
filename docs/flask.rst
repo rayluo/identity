@@ -8,7 +8,7 @@ Create `a hello world web project in Flask <https://flask.palletsprojects.com/en
 Here we assume the project's main file is named ``app.py``.
 
 
-Identity-for-Flask configuration
+Configuration
 --------------------------------
 
 #. Install dependency by ``pip install identity[flask]``
@@ -27,7 +27,7 @@ Identity-for-Flask configuration
     # [2] https://azure.github.io/AppService/2016/05/16/Disable-Session-affinity-cookie-(ARR-cookie)-for-Azure-web-apps.html
     # [3] https://learn.microsoft.com/en-us/azure/app-service/configure-common?tabs=portal#configure-general-settings
 
-#. Create an instance of the :py:class:`identity.Flask.Auth` object,
+#. Create an instance of the :py:class:`identity.flask.Auth` object,
    and assign it to a global variable inside your ``app.py``::
 
     import os
@@ -49,7 +49,7 @@ Identity-for-Flask configuration
    .. include:: auth.rst
 
 
-Flask Web App Sign In and Sign Out
+Sign In and Sign Out
 ----------------------------------
 
 #. In your web project's ``app.py``, decorate some views with the
@@ -91,7 +91,7 @@ Web app that logs in users and calls a web API on their behalf
 All of the content above are demonstrated in
 `this Flask web app sample <https://github.com/Azure-Samples/ms-identity-python-webapp>`_.
 
-API for Flask web projects
+API reference
 --------------------------
 
 .. autoclass:: identity.flask.Auth
