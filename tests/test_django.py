@@ -1,5 +1,6 @@
 from unittest import mock
-import pytest  # pytest requires at least one test case to run
+
+import pytest
 from identity.django import _parse_redirect_uri, Auth
 
 def test_parse_redirect_uri():

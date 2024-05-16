@@ -22,7 +22,7 @@ as a reference. What we need are basically these steps:
     def index(request):
         return HttpResponse("Hello, world. Everyone can read this line.")
 
-Identity-for-Django configuration
+Configuration
 ---------------------------------
 
 #. Install dependency by ``pip install identity[django]``
@@ -61,7 +61,7 @@ Identity-for-Django configuration
         ...
         ]
 
-Django Web App Sign In and Sign Out
+Sign In and Sign Out
 -----------------------------------
 
 #. In your web project's ``views.py``, decorate some views with the
@@ -103,7 +103,7 @@ All of the content above are demonstrated in
 `this django web app sample <https://github.com/Azure-Samples/ms-identity-python-webapp-django>`_.
 
 
-API for Django web projects
+API reference
 ---------------------------
 
 .. autoclass:: identity.django.Auth

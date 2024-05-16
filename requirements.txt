@@ -2,4 +2,5 @@
 # but this ./requirements.txt is referenced by docs/requirements.txt
 # which must have ALL dependencies for the docs to be built.
 -e .[all_for_docs]
-
+pytest
+pytest-asyncio
