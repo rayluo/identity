@@ -17,6 +17,7 @@
 4. Make the docs:
 
     ```bash
+    pip install -r docs/requirements.txt
     python -m mkdocs build
     cd docs
     make html
