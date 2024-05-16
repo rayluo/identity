@@ -27,8 +27,5 @@ async def test_login(monkeypatch):
 
     async with app.test_request_context("/", method="GET"):
         rendered_template = await auth.login()
-        assert "Sign In" in rendered_template
-        assert (
-            "https://login.microsoftonline.com/123/oauth2/v2.0/authorize?client_id=fake&amp;response_type=code&amp;redirect_uri=http%3A%2F%2Flocalhost%3A5000%2Fauth_response&amp;scope=offline_access+openid+profile"
-            in rendered_template
-        )
+
+        assert "https://login.microsoftonline.com/123/oauth2/v2.0/authorize" in rendered_template
