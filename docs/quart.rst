@@ -34,10 +34,13 @@ Configuration
    .. include:: auth.rst
 
 
-#. Add configuration to your ``app.py`` for `Quart-session <https://github.com/kroketio/quart-session>`_, a package which is automatically installed when you install ``identity[quart]``::
+#. Setup session management with the `Quart-session <https://github.com/kroketio/quart-session>`_ package, which currently supports either Redis or MongoDB backing stores. To use Redis as the session store, you should first install the package with the extra dependency::
+    
+    pip install quart-session[redis]
+
+#. Then add configuration to ``app.py`` pointing to your Redis instance::
 
     app.config['SESSION_TYPE'] = 'redis'
-    # Point this to your Redis instance
     app.config['SESSION_URI'] = 'redis://localhost:6379'
     
 
