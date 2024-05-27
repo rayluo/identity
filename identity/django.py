@@ -36,13 +36,13 @@ class Auth(WebFrameworkAuth):
 
     def __init__(self, *args, **kwargs):
         super(Auth, self).__init__(*args, **kwargs)
-        route, self._redirect_view = _parse_redirect_uri(self._redirect_uri)
+        route, redirect_view = _parse_redirect_uri(self._redirect_uri)
         self.urlpattern = path(route, include([
             # Note: path(..., view, ...) does not accept classmethod
             path('login', self.login),
             path('logout', self.logout, name=f"identity.logout"),
             path(
-                self._redirect_view or 'auth_response',  # The latter is used by device code flow
+                redirect_view or 'auth_response',  # The latter is used by device code flow
                 self.auth_response,
             ),
         ]))
@@ -63,15 +63,9 @@ class Auth(WebFrameworkAuth):
         if config_error:
             return self._render_auth_error(
                 request, error="configuration_error", error_description=config_error)
-        redirect_uri = request.build_absolute_uri(
-            self._redirect_view) if self._redirect_view else None
-        if redirect_uri != self._redirect_uri:
-            logger.warning(
-                "redirect_uri mismatch: configured = %s, calculated = %s",
-                self._redirect_uri, redirect_uri)
         log_in_result = self._build_auth(request.session).log_in(
             scopes=scopes,  # Have user consent to scopes (if any) during log-in
-            redirect_uri=redirect_uri,  # Optional. If present, this absolute URL must match your app's redirect_uri registered in Azure Portal
+            redirect_uri=self._redirect_uri,  # Optional. If present, this absolute URL must match your app's redirect_uri registered in Azure Portal
             prompt="select_account",  # Optional. More values defined in  https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
             next_link=next_link,
             )
