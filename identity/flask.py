@@ -1,53 +1,66 @@
-from functools import partial, wraps
-import logging
-import os
-from typing import List  # Needed in Python 3.7 & 3.8
-from urllib.parse import urlparse
-
+from typing import List, Optional  # Needed in Python 3.7 & 3.8
 from flask import (
     Blueprint, Flask,
     redirect, render_template, request, session, url_for,
 )
 from flask_session import Session
-
-from .web import WebFrameworkAuth
-
-
-logger = logging.getLogger(__name__)
+from .pallet import PalletAuth
 
 
-class Auth(WebFrameworkAuth):
+class Auth(PalletAuth):
     """A long-live identity auth helper for a Flask web project."""
+    _Blueprint = Blueprint
+    _Session = Session
+    _redirect = redirect
 
-    def __init__(self, app: Flask, *args, **kwargs):
+    def __init__(self, app: Optional[Flask], *args, **kwargs):
         """Create an identity helper for a web application.
 
         :param Flask app:
-            A Flask app instance. It will be used to register the routes.
+            It can be a Flask app instance, or ``None``.
+
+            1. If your app object is globally available, you may pass it in here.
+               Usage::
+
+                # In your app.py
+                app = Flask(__name__)
+                auth = Auth(app, authority=..., client_id=..., ...)
+
+            2. But if you are using `Application Factory pattern
+            <https://flask.palletsprojects.com/en/latest/patterns/appfactories/>`_,
+            your app is not available globally, so you need to pass ``None`` here,
+            and call :func:`Auth.init_app()` later,
+            inside or after your app factory function. Usage::
+
+                # In your auth.py
+                auth = Auth(app=None, authority=..., client_id=..., ...)
+
+                # In your other blueprints or modules
+                from auth import auth
+
+                bp = Blueprint("my_blueprint", __name__)
+
+                @bp.route("/")
+                @auth.login_required
+                def my_view(*, context):
+                    ...
+
+                # In your app.py
+                from auth import auth
+                import my_blueprint
+                def build_app():
+                    app = Flask(__name__)
+                    auth.init_app(app)
+                    app.register_blueprint(my_blueprint.bp)
+                    return app
+
+                app = build_app()
 
         It also passes extra parameters to :class:`identity.web.WebFrameworkAuth`.
         """
-        super(Auth, self).__init__(*args, **kwargs)
-        Session(app)
-        self._endpoint_prefix = "identity"  # A convention to match the template's folder name
-        bp = Blueprint(
-            self._endpoint_prefix,
-            __name__,  # It decides blueprint resource folder
-            template_folder='templates',
-        )
-        # Manually register the routes, since we cannot use @app or @bp on methods
-        if self._redirect_uri:
-            redirect_path = urlparse(self._redirect_uri).path
-            bp.route(redirect_path)(self.auth_response)
-            bp.route(
-                f"{os.path.dirname(redirect_path)}/logout"  # Use it in template by url_for("identity.logout")
-                )(self.logout)
-        else:  # For Device Code Flow, we don't have a redirect_uri
-            bp.route("/auth_response")(self.auth_response)
-            bp.route("/logout")(self.logout)
-        app.register_blueprint(bp)
-        # "Don’t do self.app = app", see https://flask.palletsprojects.com/en/3.0.x/extensiondev/#the-extension-class-and-initialization
-        self._auth = self._build_auth(session)
+        self._request = request  # Not available during class definition
+        self._session = session  # Not available during class definition
+        super(Auth, self).__init__(app, *args, **kwargs)
 
     def _render_auth_error(self, *, error, error_description=None):
         return render_template(
@@ -87,9 +100,6 @@ class Auth(WebFrameworkAuth):
                 error_description=result.get("error_description"),
                 )
         return redirect(result.get("next_link") or "/")
-
-    def logout(self):
-        return redirect(self._auth.log_out(request.host_url))
 
     def login_required(  # Named after Django's login_required
         self,
@@ -133,28 +143,5 @@ class Auth(WebFrameworkAuth):
                     )
                     ...
         """
-        # With or without brackets. Inspired by https://stackoverflow.com/a/39335652/728675
-
-        # Called with brackets, i.e. @login_required()
-        if function is None:
-            logger.debug(f"Called as @login_required(..., scopes={scopes})")
-            return partial(
-                self.login_required,
-                scopes=scopes,
-            )
-
-        # Called without brackets, i.e. @login_required
-        @wraps(function)
-        def wrapper(*args, **kwargs):
-            auth = self._auth  # In Flask, the entire app uses a singleton _auth
-            user = auth.get_user()
-            context = self._login_required(auth, user, scopes)
-            if context:
-                return function(*args, context=context, **kwargs)
-            # Save an http 302 by calling self.login(request) instead of redirect(self.login)
-            return self.login(
-                next_link=request.path,  # https://flask.palletsprojects.com/en/3.0.x/api/#flask.Request.path
-                scopes=scopes,
-                )
-        return wrapper
+        return super(Auth, self).login_required(function, scopes=scopes)
 

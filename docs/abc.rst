@@ -9,3 +9,6 @@ It is an abstract base class. You cannot use it directly.
 
    .. automethod:: __init__
 
+.. autoclass:: identity.pallet.PalletAuth
+   :members:
+
