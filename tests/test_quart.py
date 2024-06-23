@@ -29,3 +29,11 @@ async def test_login(monkeypatch):
         rendered_template = await auth.login()
 
         assert "https://login.microsoftonline.com/123/oauth2/v2.0/authorize" in rendered_template
+
+
+def test_logout():
+    """Intended to add a test case similar to test_flask.py,
+    but skipped for now because Quart's session requires a backend such as Redis.
+    In the future, we might remove the session dependency anyway and revisit this.
+    """
+

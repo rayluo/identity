@@ -19,6 +19,8 @@ class Auth(object):  # This a low level helper which is web framework agnostic
     _EXPLICITLY_REQUESTED_SCOPES = f"{__name__}.explicitly_requested_scopes"
     _STATE_NO_OP = f"{__name__}.no_op"  # A special state to indicate an auth response shall be ignored
     __NEXT_LINK = f"{__name__}.next_link"  # The next page after a successful auth
+    _END_SESSION_ENDPOINT = "end_session_endpoint"
+
     def __init__(
             self,
             *,
@@ -285,7 +287,11 @@ class Auth(object):  # This a low level helper which is web framework agnostic
         # The self._authority is usually the V1 endpoint of Microsoft Entra ID,
         # which is still good enough for log_out()
         a = self._oidc_authority or self._authority
-        return requests.get(f"{a}/.well-known/openid-configuration").json()
+        conf = requests.get(f"{a}/.well-known/openid-configuration").json()
+        if not conf.get(self._END_SESSION_ENDPOINT):
+            logger.warning(
+                "%s not found from OIDC config: %s", self._END_SESSION_ENDPOINT, conf)
+        return conf
 
     def log_out(self, homepage):
         # The vocabulary is "log out" (rather than "sign out") in the specs
@@ -305,12 +311,13 @@ class Auth(object):  # This a low level helper which is web framework agnostic
         try:
             # Empirically, Microsoft Entra ID's /v2.0 endpoint shows an account picker
             # but its default (i.e. v1.0) endpoint will sign out the (only?) account
-            e = self._get_oidc_config().get("end_session_endpoint")
-        except requests.exceptions.RequestException as e:
+            endpoint = self._get_oidc_config().get(self._END_SESSION_ENDPOINT)
+            if endpoint:
+                return f"{endpoint}?post_logout_redirect_uri={homepage}"
+        except requests.exceptions.RequestException:
             logger.exception("Failed to get OIDC config")
-            return homepage
-        else:
-            return f"{e}?post_logout_redirect_uri={homepage}" if e else homepage
+        logger.warning("No end_session_endpoint found. Fallback to %s", homepage)
+        return homepage
 
     def get_token_for_client(self, scopes):
         """Get access token for the current app, with specified scopes.

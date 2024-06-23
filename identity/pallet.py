@@ -63,7 +63,8 @@ class PalletAuth(WebFrameworkAuth):  # A common base class for Flask and Quart
         return super(PalletAuth, self).__getattribute__(name)
 
     def logout(self):
-        return self._redirect(self._auth.log_out(self._request.host_url))
+        return self.__class__._redirect(  # self._redirect(...) won't work
+            self._auth.log_out(self._request.host_url))
 
     def login_required(  # Named after Django's login_required
         self,
