@@ -4,7 +4,7 @@ from quart import Quart
 from identity.quart import Auth
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="session")
 async def test_login(monkeypatch):
     app = Quart(__name__)
     app.config["SESSION_TYPE"] = "redis"
