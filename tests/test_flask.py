@@ -9,10 +9,13 @@ def test_logout():
     app = Flask(__name__)
     app.config["SESSION_TYPE"] = "filesystem"  # Required for Flask-session,
         # see also https://stackoverflow.com/questions/26080872
-    auth = Auth(app, client_id="fake")
-    with app.test_request_context("/", method="GET"):
-        assert auth._request.host_url in auth.logout().get_data(as_text=True), (
-            "The host_url should be in the logout URL. There was a bug in 0.9.0.")
+    auth = Auth(app, client_id="fake", authority="https://example.com/foo")
+    with patch.object(auth._auth, "_get_oidc_config", new=Mock(return_value={
+        "end_session_endpoint": "https://example.com/end_session",
+    })):
+        with app.test_request_context("/", method="GET"):
+            assert auth._request.host_url in auth.logout().get_data(as_text=True), (
+                "The host_url should be in the logout URL. There was a bug in 0.9.0.")
 
 @patch("msal.authority.tenant_discovery", new=Mock(return_value={
     "authorization_endpoint": "https://example.com/placeholder",
