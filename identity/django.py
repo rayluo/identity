@@ -1,7 +1,7 @@
 from functools import partial, wraps
 import logging
 import os
-from typing import List  # Needed in Python 3.7 & 3.8
+from typing import List, Optional  # Needed in Python 3.7 & 3.8
 from urllib.parse import urlparse
 
 from django.shortcuts import redirect, render
@@ -50,9 +50,9 @@ class Auth(WebFrameworkAuth):
     def login(
         self,
         request,
-        next_link:str = None,  # Obtain the next_link from the app developer,
+        next_link: Optional[str] = None,  # Obtain the next_link from the app developer,
             # NOT from query string which could become an open redirect vulnerability.
-        scopes: List[str]=None,
+        scopes: Optional[List[str]] = None,
     ):
         # The login view.
         # App developer could redirect to the login page from inside a view,
@@ -117,7 +117,7 @@ class Auth(WebFrameworkAuth):
         function=None,
         /,  # Requires Python 3.8+
         *,
-        scopes: List[str]=None,
+        scopes: Optional[List[str]] = None,
     ):
         """A decorator that ensures the user to be logged in,
         and optinoally also have consented to a list of scopes.

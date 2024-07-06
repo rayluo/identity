@@ -3,9 +3,9 @@ from functools import partial, wraps
 from inspect import iscoroutinefunction
 import logging
 import os
-from typing import List  # Needed in Python 3.7 & 3.8
+from typing import List, Optional  # Needed in Python 3.7 & 3.8
 from urllib.parse import urlparse
-from .web import WebFrameworkAuth
+from .web import WebFrameworkAuth, Auth
 
 
 logger = logging.getLogger(__name__)
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class PalletAuth(WebFrameworkAuth):  # A common base class for Flask and Quart
     _endpoint_prefix = "identity"  # A convention to match the template's folder name
-    _auth = None  # None means not initialized yet
+    _auth: Optional[Auth] = None  # None means not initialized yet
 
     def __init__(self, app, *args, **kwargs):
         if not (
@@ -71,7 +71,7 @@ class PalletAuth(WebFrameworkAuth):  # A common base class for Flask and Quart
         function=None,
         /,  # Requires Python 3.8+
         *,
-        scopes: List[str]=None,
+        scopes: Optional[List[str]] = None,
     ):
         # With or without brackets. Inspired by https://stackoverflow.com/a/39335652/728675
 

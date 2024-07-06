@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import functools
 import logging
 import time
-from typing import List  # Needed in Python 3.7 & 3.8
+from typing import List, Optional  # Needed in Python 3.7 & 3.8
 
 import requests
 import msal
@@ -97,9 +97,14 @@ class Auth(object):  # This a low level helper which is web framework agnostic
         self._session[self._USER] = id_token_claims
 
     def log_in(
-        self, scopes=None, redirect_uri=None, state=None, prompt=None,
-        next_link=None,
-    ):
+        self,
+        *,
+        scopes: Optional[List[str]] = None,
+        redirect_uri: Optional[str] = None,
+        state: Optional[str] = None,
+        prompt: Optional[str] = None,
+        next_link: Optional[str] = None,
+    ) -> dict:
         """This is the first leg of the authentication/authorization.
 
         :param list scopes:
@@ -162,7 +167,7 @@ class Auth(object):  # This a low level helper which is web framework agnostic
                 "user_code": flow["user_code"],
                 }
 
-    def complete_log_in(self, auth_response=None):
+    def complete_log_in(self, auth_response: Optional[dict] = None) -> dict:
         """This is the second leg of the authentication/authorization.
 
         It is used inside your redirect_uri controller.
@@ -356,15 +361,15 @@ class WebFrameworkAuth(ABC):  # This is a mid-level helper to be subclassed
         client_id: str,
         *,
         client_credential=None,
-        oidc_authority: str=None,
-        authority: str=None,
-        redirect_uri: str=None,
+        oidc_authority: Optional[str] = None,
+        authority: Optional[str] = None,
+        redirect_uri: Optional[str] = None,
         # We end up accepting Microsoft Entra ID B2C parameters rather than generic urls
         # because it is troublesome to build those urls in settings.py or templates
-        b2c_tenant_name: str=None,
-        b2c_signup_signin_user_flow: str=None,
-        b2c_edit_profile_user_flow: str=None,
-        b2c_reset_password_user_flow: str=None,
+        b2c_tenant_name: Optional[str] = None,
+        b2c_signup_signin_user_flow: Optional[str] = None,
+        b2c_edit_profile_user_flow: Optional[str] = None,
+        b2c_reset_password_user_flow: Optional[str] = None,
     ):
         """Create an identity helper for a web application.
 
@@ -419,8 +424,9 @@ class WebFrameworkAuth(ABC):  # This is a mid-level helper to be subclassed
         self._client_id = client_id
         self._client_credential = client_credential
         self._redirect_uri = redirect_uri
-        self._http_cache = {}  # All subsequent Auth instances will share this
+        self._http_cache: dict = {}  # All subsequent Auth instances will share this
 
+        self._authority: Optional[str] = None  # It makes mypy happy
         # Note: We do not use overload, because we want to allow the caller to
         # have only one code path that relay in all the optional parameters.
         if b2c_tenant_name and b2c_signup_signin_user_flow:
@@ -467,7 +473,7 @@ class WebFrameworkAuth(ABC):  # This is a mid-level helper to be subclassed
 (2.3) the B2C_TENANT_NAME and SIGNUPSIGNIN_USER_FLOW pair?
 """
 
-    def _build_auth(self, session):
+    def _build_auth(self, session) -> Auth:
         return Auth(
             session=session,
             oidc_authority=self._oidc_authority,
@@ -523,7 +529,9 @@ class WebFrameworkAuth(ABC):  # This is a mid-level helper to be subclassed
             )["auth_uri"] if self._reset_password_auth and self._redirect_uri else None
 
     @abstractmethod
-    def _render_auth_error(error, *, error_description=None):
+    def _render_auth_error(
+        error, *, error_description=None,
+    ):  # Return value could be a str, or a framework-specific Response object
         # The default auth_error.html template may or may not escape.
         # If a web framework does not escape it by default, a subclass shall escape it.
         pass

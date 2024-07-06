@@ -70,11 +70,17 @@ class Auth(PalletAuth):
             reset_password_url=self._get_reset_password_url(),
             )
 
-    async def login(self, *, next_link: str=None, scopes: List[str]=None):
+    async def login(
+        self,
+        *,
+        next_link: Optional[str] = None,
+        scopes: Optional[List[str]] = None,
+    ):
         config_error = self._get_configuration_error()
         if config_error:
             return await self._render_auth_error(
                 error="configuration_error", error_description=config_error)
+        assert self._auth, "_auth should have been initialized"  # And mypy needs this
         log_in_result = self._auth.log_in(
             scopes=scopes,  # Have user consent to scopes (if any) during log-in
             redirect_uri=self._redirect_uri,
@@ -106,7 +112,7 @@ class Auth(PalletAuth):
         function=None,
         /,  # Requires Python 3.8+
         *,
-        scopes: List[str]=None,
+        scopes: Optional[List[str]] = None,
     ):
         """A decorator that ensures the user to be logged in,
         and optinoally also have consented to a list of scopes.
