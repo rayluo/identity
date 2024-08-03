@@ -44,19 +44,18 @@ def test_logout():
     request = mock.MagicMock(
         build_absolute_uri=lambda relative_uri: f"http://localhost{relative_uri}"
     )
-    with mock.patch('identity.web.requests.get', new=mock.MagicMock(
-        return_value=mock.MagicMock(
-            json=mock.MagicMock(return_value={
-                "end_session_endpoint": "https://example.com/end_session",
-            }),
-            status_code=200,
-        )
-    )):
-        response = Auth("client_id").logout(request)
+    with mock.patch('identity.web._http_get_json', return_value={
+        "end_session_endpoint": "https://example.com/end_session",
+    }):
+        response = Auth("client_id", authority="https://example.com").logout(request)
         assert response.status_code == 302
         assert response.url == "https://example.com/end_session?post_logout_redirect_uri=http://localhost/"
 
-        auth = Auth("client_id", post_logout_view=lambda r: "You have logged out")
+        auth = Auth(
+            "client_id",
+            authority="https://example.com",
+            post_logout_view=lambda r: "You have logged out",
+        )
         with mock.patch('identity.django.reverse', return_value="/post_logout"):
             response = auth.logout(request)
             assert response.status_code == 302

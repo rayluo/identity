@@ -4,7 +4,7 @@ from unittest.mock import patch, Mock
 import pytest
 from flask import Flask
 
-from identity.flask import Auth
+from identity.flask import Auth, ApiAuth
 
 
 @pytest.fixture()
@@ -16,7 +16,10 @@ def app():  # https://flask.palletsprojects.com/en/3.0.x/testing/
             # see also https://stackoverflow.com/questions/26080872
     })
     yield app
-    shutil.rmtree("flask_session")  # clean up
+    try:
+        shutil.rmtree("flask_session")  # clean up
+    except FileNotFoundError:
+        pass
 
 def build_auth(app, post_logout_view=None):
     return Auth(
@@ -41,7 +44,7 @@ def test_logout(app, customize_post_logout, expected_post_logout_uri):
         app,
         post_logout_view=post_logout_view if customize_post_logout else None,
         )
-    with patch.object(auth._auth, "_get_oidc_config", new=Mock(return_value={
+    with patch("identity.web._http_get_json", new=Mock(return_value={
         "end_session_endpoint": "https://example.com/end_session",
     })):
         with app.test_request_context("/", method="GET"):
@@ -72,4 +75,26 @@ def test_login(app):
             assert session.get("_auth_flow", {}).get("identity.web.next_link") == (
                 "http://localhost/app_root/path?foo=bar"  # The full url
                 ), "Next path should honor APPLICATION_ROOT"
+
+def test_authorization(app):
+    auth = ApiAuth(client_id="fake", oidc_authority="https://example.com/foo")
+
+    @app.route("/path")
+    @auth.authorization_required(expected_scopes=["foo"])
+    def dummy_view():
+        return "content visible when authorized"
+
+    with app.test_request_context("/path", method="GET"):
+        with app.test_client() as client:
+            result = client.get("/path")
+            assert result.status_code == 401
+            assert "WWW-Authenticate" in result.headers
+            assert "Bearer" in result.headers["WWW-Authenticate"]
+            assert result.text == auth._ERROR_MISSING_AUTHORIZATION
+
+            result = client.get("/path", headers={"Authorization": "Bearer h.b.s"})
+            assert result.status_code == 401
+            assert "WWW-Authenticate" in result.headers
+            assert "Bearer" in result.headers["WWW-Authenticate"]
+            assert result.text != auth._ERROR_MISSING_AUTHORIZATION
 
