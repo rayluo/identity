@@ -4,8 +4,7 @@ import json
 import logging
 import time
 from typing import (
-    List, Dict, Callable, Optional,  # Needed in Python 3.7 & 3.8
-    Union,  # Needed until Python 3.10+
+    Optional, Union,  # Needed until Python 3.10+
 )
 
 import jwt  # PyJWT
@@ -123,7 +122,7 @@ class Auth(object):  # This a low level helper which is web framework agnostic
     def log_in(
         self,
         *,
-        scopes: Optional[List[str]] = None,
+        scopes: Optional[list[str]] = None,
         redirect_uri: Optional[str] = None,
         state: Optional[str] = None,
         prompt: Optional[str] = None,
@@ -372,189 +371,6 @@ def _is_valid(id_token_claims, skew=None, seconds=None):
         else id_token_claims["iat"] + seconds)
 
 
-class WebFrameworkAuth(ABC):  # This is a mid-level helper to be subclassed
-    """This is a mid-level helper to be subclassed. Do not use it directly."""
-    def __init__(
-        self,
-        client_id: str,
-        *,
-        client_credential=None,
-        oidc_authority: Optional[str] = None,
-        authority: Optional[str] = None,
-        redirect_uri: Optional[str] = None,
-        # We end up accepting Microsoft Entra ID B2C parameters rather than generic urls
-        # because it is troublesome to build those urls in settings.py or templates
-        b2c_tenant_name: Optional[str] = None,
-        b2c_signup_signin_user_flow: Optional[str] = None,
-        b2c_edit_profile_user_flow: Optional[str] = None,
-        b2c_reset_password_user_flow: Optional[str] = None,
-    ):
-        """Create an identity helper for a web application.
-
-        :param str client_id:
-            The client_id of your web application, issued by its authority.
-
-        :param str client_credential:
-            It is somtimes a string.
-            The actual format is decided by the underlying auth library. TBD.
-
-        :param str oidc_authority:
-            The authority which your app registers with your OpenID Connect provider.
-            For example, ``https://example.com/foo``.
-            This library will concatenate ``/.well-known/openid-configuration``
-            to form the metadata endpoint.
-
-        :param str authority:
-            The authority which your app registers with your Microsoft Entra ID.
-            For example, ``https://example.com/foo``.
-            Historically, the underlying library will *sometimes* automatically
-            append "/v2.0" to it.
-            If you do not want that behavior, you may use ``oidc_authority`` instead.
-
-        :param str redirect_uri:
-            This will be used to mount your project's auth views accordingly.
-
-            For example, if your input here is ``https://example.com/x/y/z/redirect``,
-            then your project's redirect page will be mounted at "/x/y/z/redirect",
-            login page will be at "/x/y/z/login",
-            and logout page will be at "/x/y/z/logout".
-
-        :param str b2c_tenant_name:
-            The tenant name of your Microsoft Entra ID tenant, such as "contoso".
-            Required if your project is using Microsoft Entra ID B2C.
-
-        :param str b2c_signup_signin_user_flow:
-            The name of your Microsoft Entra ID tenant's sign-in flow,
-            such as "B2C_1_signupsignin1".
-            Required if your project is using Microsoft Entra ID B2C.
-
-        :param str b2c_edit_profile_user_flow:
-            The name of your Microsoft Entra ID tenant's edit-profile flow,
-            such as "B2C_1_profile_editing".
-            Optional.
-
-        :param str b2c_edit_profile_user_flow:
-            The name of your Microsoft Entra ID tenant's reset-password flow,
-            such as "B2C_1_reset_password".
-            Optional.
-
-        """
-        self._client_id = client_id
-        self._client_credential = client_credential
-        self._redirect_uri = redirect_uri
-        self._http_cache: dict = {}  # All subsequent Auth instances will share this
-
-        self._authority: Optional[str] = None  # It makes mypy happy
-        # Note: We do not use overload, because we want to allow the caller to
-        # have only one code path that relay in all the optional parameters.
-        if b2c_tenant_name and b2c_signup_signin_user_flow:
-            b2c_authority_template = (  # TODO: Support custom domain
-                "https://{tenant}.b2clogin.com/{tenant}.onmicrosoft.com/{user_flow}")
-            self._authority = b2c_authority_template.format(
-                tenant=b2c_tenant_name,
-                user_flow=b2c_signup_signin_user_flow,
-                http_cache=self._http_cache,
-                )
-            self._edit_profile_auth = Auth(
-                session={},
-                authority=b2c_authority_template.format(
-                    tenant=b2c_tenant_name,
-                    user_flow=b2c_edit_profile_user_flow,
-                    ),
-                client_id=client_id,
-                http_cache=self._http_cache,
-                ) if b2c_edit_profile_user_flow else None
-            self._reset_password_auth = Auth(
-                session={},
-                authority=b2c_authority_template.format(
-                    tenant=b2c_tenant_name,
-                    user_flow=b2c_reset_password_user_flow,
-                    ),
-                client_id=client_id,
-                http_cache=self._http_cache,
-                ) if b2c_reset_password_user_flow else None
-        else:
-            self._authority = authority
-            self._edit_profile_auth = None
-            self._reset_password_auth = None
-        self._oidc_authority = oidc_authority
-
-    def _get_configuration_error(self):
-        # Do not raise exception, because
-        # we want to render a nice error page later during login,
-        # which is a better developer experience especially for deployment
-        if not (self._client_id and (self._oidc_authority or self._authority)):
-            return """Almost there. Did you forget to setup at least these settings?
-(1) CLIENT_ID, and either
-(2.1) OIDC_AUTHORITY, or
-(2.2) AUTHORITY, or
-(2.3) the B2C_TENANT_NAME and SIGNUPSIGNIN_USER_FLOW pair?
-"""
-
-    def _build_auth(self, session) -> Auth:
-        return Auth(
-            session=session,
-            oidc_authority=self._oidc_authority,
-            authority=self._authority,
-            client_id=self._client_id,
-            client_credential=self._client_credential,
-            http_cache=self._http_cache,
-            )
-
-    def _login_required(self, auth: Auth, user: dict, scopes: List[str]):
-        # Returns the context. This logic is reused in the login_required decorators.
-        context = None
-        if user:
-            if scopes:
-                result = auth.get_token_for_user(scopes)  # Silently via RT
-                if isinstance(result, dict) and "access_token" in result:
-                    context = dict(
-                        user=user,
-                        # https://datatracker.ietf.org/doc/html/rfc6749#section-5.1
-                        access_token=result["access_token"],
-                        token_type=result.get("token_type", "Bearer"),
-                        expires_in=result.get("expires_in", 300),
-                        refresh_token=result.get("refresh_token"),
-                    )
-                    context["scopes"] = result["scope"].split() if result.get(
-                        "scope") else scopes
-                else:  # Token request failed
-                    logger.error(
-                        "Access token unavailable. Error: %s, Desc: %s, keys: %s",
-                        result.get("error"), result.get("error_description"),
-                        result.keys())
-                    context = None  # Token request failed
-            else:
-                context = {"user": user}
-        else:  # User has not logged in at all
-            context = None
-        return context
-
-    def get_edit_profile_url(self):
-        """A helper to get the URL for Microsoft Entra B2C's edit profile page.
-
-        You can pass this URL to your template and render it there.
-        """
-        return self._edit_profile_auth.log_in(
-            redirect_uri=self._redirect_uri,
-            state=self._edit_profile_auth._STATE_NO_OP,
-            )["auth_uri"] if self._edit_profile_auth and self._redirect_uri else None
-
-    def _get_reset_password_url(self):
-        return self._reset_password_auth.log_in(
-            redirect_uri=self._redirect_uri,
-            state=self._reset_password_auth._STATE_NO_OP,
-            )["auth_uri"] if self._reset_password_auth and self._redirect_uri else None
-
-    @abstractmethod
-    def _render_auth_error(
-        error, *, error_description=None,
-    ):  # Return value could be a str, or a framework-specific Response object
-        # The default auth_error.html template may or may not escape.
-        # If a web framework does not escape it by default, a subclass shall escape it.
-        pass
-
-
 class HttpError(Exception):
     def __init__(self, status_code, *, headers, description=None):
         self.status_code = status_code
@@ -562,7 +378,7 @@ class HttpError(Exception):
         self.description = description
 
 
-class ApiAuth(ABC):  # Unlike Auth, this does not use session
+class ApiAuth(ABC):
     _INVALID_REQUEST = "invalid_request"
     _INVALID_TOKEN = "invalid_token"
     _INSUFFICIENT_SCOPE = "insufficient_scope"
@@ -570,10 +386,11 @@ class ApiAuth(ABC):  # Unlike Auth, this does not use session
 
     def __init__(
         self,
+        client_id: str,
         *,
-        client_id,
-        oidc_authority=None,
-        authority=None,
+        oidc_authority: Optional[str] = None,
+        authority: Optional[str] = None,
+        # Unlike web application's auth, this does not use session
     ):
         """Create an ApiAuth instance for a web API.
 
@@ -616,7 +433,7 @@ class ApiAuth(ABC):  # Unlike Auth, this does not use session
         *,
         error_description: str = None,
         error_uri: str = None,
-        scopes: List[str] = None,
+        scopes: list[str] = None,
     ):
         # https://datatracker.ietf.org/doc/html/rfc6750#section-3
         auth_params = ", ".join(
@@ -673,7 +490,7 @@ class ApiAuth(ABC):  # Unlike Auth, this does not use session
         self,
         token:str,
         *,
-        scopes: Union[List[str], Dict[str, str]],
+        scopes: Union[list[str], dict[str, str]],
     ):
         # Return claims of the JWT if valid, otherwise calls __raise_oauth2_error()
         try:
@@ -755,8 +572,8 @@ class ApiAuth(ABC):  # Unlike Auth, this does not use session
     def authorization_required(  # Lengthy but precise name
         self,
         *,
-        expected_scopes: List[str],  # TODO: Accept a callable in RESTful API scenario?
-        #extra_scopes: List[str]=None,  # TODO: For OBO. UPDATE: No, OBO shall be done by ApiCaller(context, scope)
+        expected_scopes: list[str],  # TODO: Accept a callable in RESTful API scenario?
+        #extra_scopes: list[str]=None,  # TODO: For OBO. UPDATE: No, OBO shall be done by ApiCaller(context, scope)
     ):
         # Sub-classes inherit the docstring, so we only document the commen params.
         """It returns a decorator that verifies the request's authorization header.
@@ -780,3 +597,189 @@ class ApiAuth(ABC):  # Unlike Auth, this does not use session
         """
         raise NotImplementedError("Subclass must implement this method")
 
+
+class WebFrameworkAuth(  # This is a mid-level helper to be subclassed
+    ApiAuth,  # After prototyping, we chose to have one class for web app and web API
+):
+    """This is a mid-level helper to be subclassed. Do not use it directly."""
+    def __init__(
+        self,
+        client_id: str,
+        *,
+        client_credential=None,
+        oidc_authority: Optional[str] = None,
+        authority: Optional[str] = None,
+        redirect_uri: Optional[str] = None,
+        # We end up accepting Microsoft Entra ID B2C parameters rather than generic urls
+        # because it is troublesome to build those urls in settings.py or templates
+        b2c_tenant_name: Optional[str] = None,
+        b2c_signup_signin_user_flow: Optional[str] = None,
+        b2c_edit_profile_user_flow: Optional[str] = None,
+        b2c_reset_password_user_flow: Optional[str] = None,
+    ):
+        """Create an identity helper for a web application.
+
+        :param str client_id:
+            The client_id of your web application, issued by its authority.
+
+        :param str client_credential:
+            It is somtimes a string.
+            The actual format is decided by the underlying auth library. TBD.
+
+        :param str oidc_authority:
+            The authority which your app registers with your OpenID Connect provider.
+            For example, ``https://example.com/foo``.
+            This library will concatenate ``/.well-known/openid-configuration``
+            to form the metadata endpoint.
+
+        :param str authority:
+            The authority which your app registers with your Microsoft Entra ID.
+            For example, ``https://example.com/foo``.
+            Historically, the underlying library will *sometimes* automatically
+            append "/v2.0" to it.
+            If you do not want that behavior, you may use ``oidc_authority`` instead.
+
+        :param str redirect_uri:
+            This will be used to mount your project's auth views accordingly.
+
+            For example, if your input here is ``https://example.com/x/y/z/redirect``,
+            then your project's redirect page will be mounted at "/x/y/z/redirect",
+            login page will be at "/x/y/z/login",
+            and logout page will be at "/x/y/z/logout".
+
+        :param str b2c_tenant_name:
+            The tenant name of your Microsoft Entra ID tenant, such as "contoso".
+            Required if your project is using Microsoft Entra ID B2C.
+
+        :param str b2c_signup_signin_user_flow:
+            The name of your Microsoft Entra ID tenant's sign-in flow,
+            such as "B2C_1_signupsignin1".
+            Required if your project is using Microsoft Entra ID B2C.
+
+        :param str b2c_edit_profile_user_flow:
+            The name of your Microsoft Entra ID tenant's edit-profile flow,
+            such as "B2C_1_profile_editing".
+            Optional.
+
+        :param str b2c_edit_profile_user_flow:
+            The name of your Microsoft Entra ID tenant's reset-password flow,
+            such as "B2C_1_reset_password".
+            Optional.
+
+        """
+        # self._client_id = client_id
+        self._client_credential = client_credential
+        self._redirect_uri = redirect_uri
+        self._http_cache: dict = {}  # All subsequent Auth instances will share this
+
+        _authority: Optional[str] = None  # It makes mypy happy
+        # Note: We do not use overload, because we want to allow the caller to
+        # have only one code path that relay in all the optional parameters.
+        if b2c_tenant_name and b2c_signup_signin_user_flow:
+            b2c_authority_template = (  # TODO: Support custom domain
+                "https://{tenant}.b2clogin.com/{tenant}.onmicrosoft.com/{user_flow}")
+            _authority = b2c_authority_template.format(
+                tenant=b2c_tenant_name,
+                user_flow=b2c_signup_signin_user_flow,
+                http_cache=self._http_cache,
+                )
+            self._edit_profile_auth = Auth(
+                session={},
+                authority=b2c_authority_template.format(
+                    tenant=b2c_tenant_name,
+                    user_flow=b2c_edit_profile_user_flow,
+                    ),
+                client_id=client_id,
+                http_cache=self._http_cache,
+                ) if b2c_edit_profile_user_flow else None
+            self._reset_password_auth = Auth(
+                session={},
+                authority=b2c_authority_template.format(
+                    tenant=b2c_tenant_name,
+                    user_flow=b2c_reset_password_user_flow,
+                    ),
+                client_id=client_id,
+                http_cache=self._http_cache,
+                ) if b2c_reset_password_user_flow else None
+        else:
+            _authority = authority
+            self._edit_profile_auth = None
+            self._reset_password_auth = None
+        # self._oidc_authority = oidc_authority
+        # self._authority = self._authority or _authority
+        super().__init__(client_id, oidc_authority=oidc_authority, authority=_authority)
+
+    def _get_configuration_error(self):
+        # Do not raise exception, because
+        # we want to render a nice error page later during login,
+        # which is a better developer experience especially for deployment
+        if not (self._client_id and (self._oidc_authority or self._authority)):
+            return """Almost there. Did you forget to setup at least these settings?
+(1) CLIENT_ID, and either
+(2.1) OIDC_AUTHORITY, or
+(2.2) AUTHORITY, or
+(2.3) the B2C_TENANT_NAME and SIGNUPSIGNIN_USER_FLOW pair?
+"""
+
+    def _build_auth(self, session) -> Auth:
+        return Auth(
+            session=session,
+            oidc_authority=self._oidc_authority,
+            authority=self._authority,
+            client_id=self._client_id,
+            client_credential=self._client_credential,
+            http_cache=self._http_cache,
+            )
+
+    def _login_required(self, auth: Auth, user: dict, scopes: list[str]):
+        # Returns the context. This logic is reused in the login_required decorators.
+        context = None
+        if user:
+            if scopes:
+                result = auth.get_token_for_user(scopes)  # Silently via RT
+                if isinstance(result, dict) and "access_token" in result:
+                    context = dict(
+                        user=user,
+                        # https://datatracker.ietf.org/doc/html/rfc6749#section-5.1
+                        access_token=result["access_token"],
+                        token_type=result.get("token_type", "Bearer"),
+                        expires_in=result.get("expires_in", 300),
+                        refresh_token=result.get("refresh_token"),
+                    )
+                    context["scopes"] = result["scope"].split() if result.get(
+                        "scope") else scopes
+                else:  # Token request failed
+                    logger.error(
+                        "Access token unavailable. Error: %s, Desc: %s, keys: %s",
+                        result.get("error"), result.get("error_description"),
+                        result.keys())
+                    context = None  # Token request failed
+            else:
+                context = {"user": user}
+        else:  # User has not logged in at all
+            context = None
+        return context
+
+    def get_edit_profile_url(self):
+        """A helper to get the URL for Microsoft Entra B2C's edit profile page.
+
+        You can pass this URL to your template and render it there.
+        """
+        return self._edit_profile_auth.log_in(
+            redirect_uri=self._redirect_uri,
+            state=self._edit_profile_auth._STATE_NO_OP,
+            )["auth_uri"] if self._edit_profile_auth and self._redirect_uri else None
+
+    def _get_reset_password_url(self):
+        return self._reset_password_auth.log_in(
+            redirect_uri=self._redirect_uri,
+            state=self._reset_password_auth._STATE_NO_OP,
+            )["auth_uri"] if self._reset_password_auth and self._redirect_uri else None
+
+    @abstractmethod
+    def _render_auth_error(
+        error, *, error_description=None,
+    ):  # Return value could be a str, or a framework-specific Response object
+        # The default auth_error.html template may or may not escape.
+        # If a web framework does not escape it by default, a subclass shall escape it.
+        pass

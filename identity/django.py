@@ -223,8 +223,6 @@ class Auth(WebFrameworkAuth):
                 )
         return wrapper
 
-
-class ApiAuth(_ApiAuth):
     def authorization_required(self, *, expected_scopes, **kwargs):
         def decorator(function):
             @wraps(function)

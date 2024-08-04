@@ -1,6 +1,7 @@
 from typing import List, Optional  # Needed in Python 3.7 & 3.8
 from quart import (
     Blueprint, Quart,
+    abort, make_response,
     redirect, render_template, request, session, url_for,
 )
 from quart_session import Session
@@ -13,10 +14,12 @@ class Auth(PalletAuth):
     _Session = Session
     _redirect = redirect
     _url_for = url_for
+    _abort = abort
+    _make_response = make_response
 
     def __init__(
         self,
-        app: Optional[Quart],
+        app: Optional[Quart] = None,
         *args,
         post_logout_view: Optional[callable] = None,
         **kwargs,

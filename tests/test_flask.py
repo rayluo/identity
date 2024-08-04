@@ -4,7 +4,7 @@ from unittest.mock import patch, Mock
 import pytest
 from flask import Flask
 
-from identity.flask import Auth, ApiAuth
+from identity.flask import Auth
 
 
 @pytest.fixture()
@@ -77,7 +77,7 @@ def test_login(app):
                 ), "Next path should honor APPLICATION_ROOT"
 
 def test_authorization(app):
-    auth = ApiAuth(client_id="fake", oidc_authority="https://example.com/foo")
+    auth = Auth(client_id="fake", oidc_authority="https://example.com/foo")
 
     @app.route("/path")
     @auth.authorization_required(expected_scopes=["foo"])
