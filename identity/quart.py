@@ -168,3 +168,17 @@ class Auth(PalletAuth):
 
         """
         return super(Auth, self).login_required(function, scopes=scopes)
+
+    def raise_http_error(self, status_code, *, headers=None, description=None):
+        """Override to use HttpError exception instead of direct response creation.
+
+        Unlike Flask's synchronous make_response and abort functions, Quart's
+        make_response is async and requires await. Since this method is called
+        from the synchronous _validate() method, we cannot await here.
+
+        Instead, we raise an HttpError exception which is caught and properly
+        converted to a Quart response in the async wrapper of PalletAuth's
+        authorization_required decorator.
+        """
+        from .web import HttpError
+        raise HttpError(status_code, headers=headers, description=description)
