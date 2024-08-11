@@ -45,7 +45,7 @@ Django Web API protected by an access token
 -------------------------------------------
 
 #. In your web project's ``views.py``, decorate some views with the
-   :py:func:`identity.django.ApiAuth.authorization_required` decorator::
+   :py:func:`identity.django.Auth.authorization_required` decorator::
 
     from django.conf import settings
 
@@ -69,7 +69,7 @@ All of the content above are demonstrated in
 API for Django web projects
 ---------------------------
 
-.. autoclass:: identity.django.ApiAuth
+.. autoclass:: identity.django.Auth
    :members:
    :inherited-members:
 

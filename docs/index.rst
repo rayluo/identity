@@ -51,6 +51,7 @@ This Identity library is a Python authentication/authorization library that:
    flask
    flask-webapi
    quart
+   quart-webapi
    abc
    generic
 
