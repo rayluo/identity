@@ -170,11 +170,13 @@ class Auth(WebFrameworkAuth):
             if context:
                 try:
                     return function(request, *args, context=context, **kwargs)
-                except TypeError:
-                    raise RuntimeError(
-                        "Since identity 0.6.0, the '@login_required(...)' decorated "
-                        "view should accept a keyword argument named 'context'. "
-                        "For example, def my_view(request, *, context): ...") from None
+                except TypeError as exp:
+                    if "context" in str(exp):
+                        raise RuntimeError(
+                            "Since identity 0.6.0, the '@login_required(...)' decorated "
+                            "view should accept a keyword argument named 'context'. "
+                            "For example, def my_view(request, *, context): ...") from exp
+                    raise
             # Save an http 302 by calling self.login(request) instead of redirect(self.login)
             return self.login(
                 request,
