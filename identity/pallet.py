@@ -3,6 +3,7 @@ from functools import partial, wraps
 from inspect import iscoroutinefunction
 import logging
 import os
+import re
 from typing import List  # Needed in Python 3.7 & 3.8
 from urllib.parse import urlparse
 from .web import WebFrameworkAuth
@@ -102,7 +103,8 @@ class PalletAuth(WebFrameworkAuth):  # A common base class for Flask and Quart
                     return function(*args, context=context, **kwargs)
                 # Save an http 302 by calling self.login(request) instead of redirect(self.login)
                 return self.login(
-                    next_link=self._request.path,  # https://flask.palletsprojects.com/en/3.0.x/api/#flask.Request.path
+                    # https://flask.palletsprojects.com/en/3.0.x/api/#flask.Request.path
+                    next_link=re.sub("/{2,}", "/", f"{self._request.script_root}/{self._request.path}"),  
                     scopes=scopes,
                     )
         return wrapper
