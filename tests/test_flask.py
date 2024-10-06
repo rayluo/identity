@@ -40,17 +40,21 @@ def test_logout(app, auth):
     "authorization_endpoint": "https://example.com/placeholder",
     "token_endpoint": "https://example.com/placeholder",
     }))
-def test_login_should_locate_its_template():
-    app = Flask(__name__)
-    app.config["SESSION_TYPE"] = "filesystem"  # Required for Flask-session,
-        # see also https://stackoverflow.com/questions/26080872
-    client_id = str(hash(app))
-    auth = Auth(
-        app,
-        client_id=client_id,
-        redirect_uri="http://localhost:5000/redirect",  # To use auth code flow
-        oidc_authority="https://example.com/foo",
-        )
-    with app.test_request_context("/", method="GET"):
-        assert client_id in auth.login()  # Proper template output contains client_id
+def test_login(app, auth):
+
+    @app.route("/path")
+    @auth.login_required
+    def dummy_view():
+        return "content visible after login"
+
+    with app.test_request_context("/path", method="GET"):
+        should_find_template = "login() should have template to render"
+        assert auth._client_id in auth.login(), should_find_template
+        with app.test_client() as client:
+            result = client.get("/path?foo=bar")
+            assert auth._client_id in str(result.data), should_find_template
+            from flask import session  # It is different than auth._auth._session
+            assert session.get("_auth_flow", {}).get("identity.web.next_link") == (
+                "http://localhost/app_root/path?foo=bar"  # The full url
+                ), "Next path should honor APPLICATION_ROOT"
 
