@@ -64,7 +64,7 @@ class PalletAuth(WebFrameworkAuth):  # A common base class for Flask and Quart
 
     def logout(self):
         return self.__class__._redirect(  # self._redirect(...) won't work
-            self._auth.log_out(self._request.host_url))
+            self._auth.log_out(self._request.url_root))
 
     def login_required(  # Named after Django's login_required
         self,
@@ -92,7 +92,7 @@ class PalletAuth(WebFrameworkAuth):  # A common base class for Flask and Quart
                 if context:
                     return await function(*args, context=context, **kwargs)
                 # Save an http 302 by calling self.login(request) instead of redirect(self.login)
-                return await self.login(next_link=self._request.path, scopes=scopes)
+                return await self.login(next_link=self._request.url, scopes=scopes)
         else:  # For Flask
             @wraps(function)
             def wrapper(*args, **kwargs):
@@ -101,9 +101,6 @@ class PalletAuth(WebFrameworkAuth):  # A common base class for Flask and Quart
                 if context:
                     return function(*args, context=context, **kwargs)
                 # Save an http 302 by calling self.login(request) instead of redirect(self.login)
-                return self.login(
-                    next_link=self._request.path,  # https://flask.palletsprojects.com/en/3.0.x/api/#flask.Request.path
-                    scopes=scopes,
-                    )
+                return self.login(next_link=self._request.url, scopes=scopes)
         return wrapper
 
