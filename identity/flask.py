@@ -13,8 +13,14 @@ class Auth(PalletAuth):
     _Session = Session
     _redirect = redirect
 
-    def __init__(self, app: Optional[Flask], *args, **kwargs):
-        """Create an identity helper for a web application.
+    def __init__(
+        self,
+        app: Optional[Flask],
+        *args,
+        post_logout_view: Optional[callable] = None,
+        **kwargs,
+    ):
+        """Initialize the Auth class for a Flask web application.
 
         :param Flask app:
             It can be a Flask app instance, or ``None``.
@@ -56,10 +62,17 @@ class Auth(PalletAuth):
 
                 app = build_app()
 
+        :param callable post_logout_view:
+            Optional.
+            If not provided, the user will be redirected to the root URL of the app.
+            If provided, it shall be the view (which is a function)
+            that will be redirected to, after the user has logged out.
+
         It also passes extra parameters to :class:`identity.web.WebFrameworkAuth`.
         """
         self._request = request  # Not available during class definition
         self._session = session  # Not available during class definition
+        self._post_logout_view = post_logout_view
         super(Auth, self).__init__(app, *args, **kwargs)
 
     def _render_auth_error(  # type: ignore[override]
@@ -152,4 +165,9 @@ class Auth(PalletAuth):
                     ...
         """
         return super(Auth, self).login_required(function, scopes=scopes)
+
+    def logout(self):
+        return super(Auth, self).logout(url_for(
+            self._post_logout_view.__name__, _external=True,
+            ) if self._post_logout_view else None)
 

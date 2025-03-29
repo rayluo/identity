@@ -2,9 +2,14 @@ import os
 from unittest import mock
 
 import pytest
+from django.conf import settings
 
 from identity.django import _parse_redirect_uri, Auth
 
+urlpatterns = []  # This is required for Django to recognize the URL patterns
+settings.configure(
+    ROOT_URLCONF='test_django',  # Set the root URL configuration
+)
 
 def test_parse_redirect_uri():
     with pytest.raises(ValueError):
@@ -35,3 +40,24 @@ def test_the_installed_package_contains_builtin_templates():
                 templates_found.add(t)
     assert templates_needed == templates_found
 
+def test_logout():
+    request = mock.MagicMock(
+        build_absolute_uri=lambda relative_uri: f"http://localhost{relative_uri}"
+    )
+    with mock.patch('identity.web.requests.get', new=mock.MagicMock(
+        return_value=mock.MagicMock(
+            json=mock.MagicMock(return_value={
+                "end_session_endpoint": "https://example.com/end_session",
+            }),
+            status_code=200,
+        )
+    )):
+        response = Auth("client_id").logout(request)
+        assert response.status_code == 302
+        assert response.url == "https://example.com/end_session?post_logout_redirect_uri=http://localhost/"
+
+        auth = Auth("client_id", post_logout_view=lambda r: "You have logged out")
+        with mock.patch('identity.django.reverse', return_value="/post_logout"):
+            response = auth.logout(request)
+            assert response.status_code == 302
+            assert response.url == "https://example.com/end_session?post_logout_redirect_uri=http://localhost/post_logout"

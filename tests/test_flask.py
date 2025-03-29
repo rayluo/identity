@@ -18,29 +18,44 @@ def app():  # https://flask.palletsprojects.com/en/3.0.x/testing/
     yield app
     shutil.rmtree("flask_session")  # clean up
 
-@pytest.fixture()
-def auth(app):
+def build_auth(app, post_logout_view=None):
     return Auth(
         app,
         client_id="fake",
         redirect_uri="http://localhost:5000/redirect",  # To use auth code flow
         oidc_authority="https://example.com/foo",
+        post_logout_view=post_logout_view,
     )
 
-def test_logout(app, auth):
+@pytest.mark.parametrize("customize_post_logout,expected_post_logout_uri", [
+    (False, "http://localhost/app_root/"),
+    (True, "http://localhost/app_root/my_post_logout_page"),
+])
+def test_logout(app, customize_post_logout, expected_post_logout_uri):
+
+    @app.route("/my_post_logout_page")
+    def post_logout_view():
+        return "You have logged out"
+
+    auth = build_auth(
+        app,
+        post_logout_view=post_logout_view if customize_post_logout else None,
+        )
     with patch.object(auth._auth, "_get_oidc_config", new=Mock(return_value={
         "end_session_endpoint": "https://example.com/end_session",
     })):
         with app.test_request_context("/", method="GET"):
-            homepage = "http://localhost/app_root"
-            assert homepage in auth.logout().get_data(as_text=True), (
-                "The homepage should be in the logout URL. There was a bug in 0.9.0.")
+            assert (
+                f"?post_logout_redirect_uri={expected_post_logout_uri}</a>"
+                in auth.logout().get_data(as_text=True)
+                ), "The post-login uri should be in the logout page"
 
 @patch("msal.authority.tenant_discovery", new=Mock(return_value={
     "authorization_endpoint": "https://example.com/placeholder",
     "token_endpoint": "https://example.com/placeholder",
     }))
-def test_login(app, auth):
+def test_login(app):
+    auth = build_auth(app)
 
     @app.route("/path")
     @auth.login_required

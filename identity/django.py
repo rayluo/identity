@@ -34,7 +34,30 @@ class Auth(WebFrameworkAuth):
     your project's ``urlpatterns`` list in ``your_project/urls.py``.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        *args,
+        post_logout_view: Optional[callable] = None,
+        **kwargs,
+    ):
+        """Initialize the Auth class for a Django web application.
+
+        :param callable post_logout_view:
+            Optional.
+            If not provided, the user will be redirected to the root URL of the app.
+
+            If provided, it shall be the view (which is a function)
+            that will be redirected to, after the user has logged out.
+            For example, you will typically use this parameter like this::
+
+                from . import public_views  # This module shall NOT import settings.AUTH
+                auth = Auth(
+                    ...,
+                    post_logout_view=public_views.my_post_logout_view,
+                )
+
+            where ``my_post_logout_view`` is a Django view function.
+        """
         super(Auth, self).__init__(*args, **kwargs)
         route, redirect_view = _parse_redirect_uri(self._redirect_uri)
         self.urlpattern = path(route, include([
@@ -46,6 +69,7 @@ class Auth(WebFrameworkAuth):
                 self.auth_response,
             ),
         ]))
+        self._post_logout_view = post_logout_view
 
     def login(
         self,
@@ -109,8 +133,9 @@ class Auth(WebFrameworkAuth):
         So you can use ``{% url "identity.django.logout" %}`` to get the url
         from inside a template.
         """
-        return redirect(
-            self._build_auth(request.session).log_out(request.build_absolute_uri("/")))
+        return redirect(self._build_auth(request.session).log_out(request.build_absolute_uri(
+            reverse(self._post_logout_view) if self._post_logout_view else "/"
+        )))
 
     def login_required(  # Named after Django's login_required
         self,

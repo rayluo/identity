@@ -298,13 +298,13 @@ class Auth(object):  # This a low level helper which is web framework agnostic
                 "%s not found from OIDC config: %s", self._END_SESSION_ENDPOINT, conf)
         return conf
 
-    def log_out(self, homepage):
+    def log_out(self, post_logout_redirect_uri: str) -> str:
         # The vocabulary is "log out" (rather than "sign out") in the specs
         # https://openid.net/specs/openid-connect-frontchannel-1_0.html
         """Logs out the user from current app.
 
-        :param str homepage:
-            The page to be redirected to, after the log-out.
+        :param str post_logout_redirect_uri:
+            The absolute uri of the page to be redirected to, after the log-out.
             In Flask, you can pass in ``url_for("index", _external=True)``.
 
         :return:
@@ -318,11 +318,11 @@ class Auth(object):  # This a low level helper which is web framework agnostic
             # but its default (i.e. v1.0) endpoint will sign out the (only?) account
             endpoint = self._get_oidc_config().get(self._END_SESSION_ENDPOINT)
             if endpoint:
-                return f"{endpoint}?post_logout_redirect_uri={homepage}"
+                return f"{endpoint}?post_logout_redirect_uri={post_logout_redirect_uri}"
         except requests.exceptions.RequestException:
             logger.exception("Failed to get OIDC config")
-        logger.warning("No end_session_endpoint found. Fallback to %s", homepage)
-        return homepage
+        logger.warning("No end_session_endpoint found. Fallback to %s", post_logout_redirect_uri)
+        return post_logout_redirect_uri  # Fall back to this
 
     def get_token_for_client(self, scopes):
         """Get access token for the current app, with specified scopes.
