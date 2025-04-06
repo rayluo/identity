@@ -12,6 +12,7 @@ class Auth(PalletAuth):
     _Blueprint = Blueprint
     _Session = Session
     _redirect = redirect
+    _url_for = url_for
 
     def __init__(
         self,
@@ -165,9 +166,4 @@ class Auth(PalletAuth):
                     ...
         """
         return super(Auth, self).login_required(function, scopes=scopes)
-
-    def logout(self):
-        return super(Auth, self).logout(url_for(
-            self._post_logout_view.__name__, _external=True,
-            ) if self._post_logout_view else None)
 
