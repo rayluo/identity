@@ -40,9 +40,18 @@ Configuration
 
     auth = Auth(
         app,
+
+        # Instruction for these settings is available in this project's README file.
+        # https://github.com/rayluo/identity?tab=readme-ov-file#scenarios-supported
         os.getenv('CLIENT_ID'),
         client_credential=os.getenv('CLIENT_SECRET'),
-        redirect_uri=os.getenv('REDIRECT_URI'),
+        redirect_uri=
+            # Recommended to register and use a redirect_uri.
+            # It looks like http://localhost:5000/redirect for local development,
+            # or https://your_website.com/redirect for your production.
+            # If absent, Identity library will fall back to a Device Code mode.
+            os.getenv('REDIRECT_URI'),
+
         ...,  # See below on how to feed in the authority url parameter
         )
 

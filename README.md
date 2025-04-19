@@ -30,7 +30,7 @@ This Identity library is an authentication/authorization library that:
   </tr>
 
   <tr>
-    <th>App Registration</th>
+    <th rowspan=2>App Registration</th>
     <td><!-- See https://github.com/github/cmark-gfm/issues/12 -->
 
 Following only the step 1, 2 and 3  of this
@@ -53,6 +53,26 @@ Following only the step 1 and 2 (including 2.1 and 2.2) of this
 [Configure authentication in a sample Python web app by using Azure AD B2C](https://learn.microsoft.com/azure/active-directory-b2c/configure-authentication-sample-python-web-app?tabs=linux)
 
 </td>
+  </tr>
+
+  <tr>
+    <td colspan=4>
+After app registration, you shall obtain the following information:
+
+* Your app's `client_id`, also known as application ID.
+  (For example, if you are using Entra ID, you may follow this
+  [app registration document](https://learn.microsoft.com/entra/identity-platform/quickstart-register-app)).
+* Your app's credential, which can either be a secret string, or a certificate.
+  (For example, if you are using Entra ID, you may follow this
+  [app credential document](https://learn.microsoft.com/entra/identity-platform/how-to-add-credentials?tabs=client-secret)).
+  The `Identity` library's `client_credential` parameter supports all formats supported by
+  [`msal` library's same name parameter](https://msal-python.readthedocs.io/en/latest/#msal.ClientApplication.params.client_credential).
+* Your app's Redirect URI.
+  You may prepare two, one of them looks like `http://localhost:5000/redirect` for local development,
+  the other looks like `https://your_website.com/redirect` for your production.
+  (For example, if you are using Entra ID, you may follow this
+  [redirect URI document](https://learn.microsoft.com/entra/identity-platform/how-to-add-redirect-uri)).
+    </td>
   </tr>
 
   <tr>
