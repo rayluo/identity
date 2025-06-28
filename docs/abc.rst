@@ -11,4 +11,7 @@ It is an abstract base class. You cannot use it directly.
 
 .. autoclass:: identity.pallet.PalletAuth
    :members:
+   :inherited-members:
+
+   .. automethod:: __init__
 

@@ -38,6 +38,7 @@ class Auth(WebFrameworkAuth):
         self,
         *args,
         post_logout_view: Optional[callable] = None,
+        prompt: Optional[str] = None,
         **kwargs,
     ):
         """Initialize the Auth class for a Django web application.
@@ -57,7 +58,18 @@ class Auth(WebFrameworkAuth):
                 )
 
             where ``my_post_logout_view`` is a Django view function.
+
+        :param str prompt:
+            Optional. The prompt parameter to be used during login.
+            Valid values are defined in
+            `OpenID Connect Core spec <https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest>`_.
+
+            Starting from Identity 0.11.0,
+            the default value is changed from ``"select_account"`` to ``None``.
+            ``None`` means no prompt will be sent in the authentication request,
+            not even string ``"none"``. The Identity Server will decide whether to prompt.
         """
+        self._prompt = prompt
         super(Auth, self).__init__(*args, **kwargs)
         route, redirect_view = _parse_redirect_uri(self._redirect_uri)
         self.urlpattern = path(route, include([
@@ -90,7 +102,7 @@ class Auth(WebFrameworkAuth):
         log_in_result = self._build_auth(request.session).log_in(
             scopes=scopes,  # Have user consent to scopes (if any) during log-in
             redirect_uri=self._redirect_uri,  # Optional. If present, this absolute URL must match your app's redirect_uri registered in Azure Portal
-            prompt="select_account",  # Optional. More values defined in  https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
+            prompt=self._prompt,  # Optional. More values defined in  https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
             next_link=next_link,
             )
         if "error" in log_in_result:
@@ -209,4 +221,3 @@ class Auth(WebFrameworkAuth):
                 scopes=scopes,
                 )
         return wrapper
-

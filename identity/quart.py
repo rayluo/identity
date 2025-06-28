@@ -69,7 +69,7 @@ class Auth(PalletAuth):
             If provided, it shall be the view (which is a function)
             that will be redirected to, after the user has logged out.
 
-        It also passes extra parameters to :class:`identity.web.WebFrameworkAuth`.
+        It also passes extra parameters to :class:`identity.pallet.PalletAuth`.
         """
         self._request = request  # Not available during class definition
         self._session = session  # Not available during class definition
@@ -98,7 +98,7 @@ class Auth(PalletAuth):
         log_in_result = self._auth.log_in(
             scopes=scopes,  # Have user consent to scopes (if any) during log-in
             redirect_uri=self._redirect_uri,
-            prompt="select_account",  # Optional. More values defined in  https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
+            prompt=self._prompt,  # self._prompt was defined in parent class
             next_link=next_link,
             )
         if "error" in log_in_result:
@@ -165,4 +165,3 @@ class Auth(PalletAuth):
 
         """
         return super(Auth, self).login_required(function, scopes=scopes)
-

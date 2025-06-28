@@ -11,11 +11,33 @@ from .web import WebFrameworkAuth, Auth
 logger = logging.getLogger(__name__)
 
 
-class PalletAuth(WebFrameworkAuth):  # A common base class for Flask and Quart
+class PalletAuth(WebFrameworkAuth):
+    """A common base class for Flask and Quart web authentication.
+
+    Provides shared functionality for login handling, session management, and routing
+    used by both Flask and Quart framework implementations.
+    """
     _endpoint_prefix = "identity"  # A convention to match the template's folder name
     _auth: Optional[Auth] = None  # None means not initialized yet
 
-    def __init__(self, app, *args, **kwargs):
+    def __init__(self, app, *args, prompt: Optional[str] = None, **kwargs):
+        """Initialize the Auth class for a Pallet-based web application.
+
+        :param app:
+            The Flask or Quart application instance, or ``None``.
+            If None, you must call init_app() later. This pattern can be useful
+            when your project does not use a global app object, such as when using
+            the application factory pattern.
+        :param str prompt:
+            Optional. The prompt parameter to be used during login.
+            Valid values are defined in
+            `OpenID Connect Core spec <https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest>`_.
+
+            Starting from Identity 0.11.0,
+            the default value is changed from ``"select_account"`` to ``None``.
+            ``None`` means no prompt will be sent in the authentication request,
+            not even string ``"none"``. The Identity Server will decide whether to prompt.
+        """
         if not (
             self._Blueprint and self._Session and self._redirect
             and getattr(self, "_session", None) is not None
@@ -24,6 +46,7 @@ class PalletAuth(WebFrameworkAuth):  # A common base class for Flask and Quart
             raise RuntimeError(
                 "Subclass must provide "
                 "_Blueprint, _Session, _redirect, _session, and _request.")
+        self._prompt = prompt
         super(PalletAuth, self).__init__(*args, **kwargs)
         self._bp = bp = self._Blueprint(
             self._endpoint_prefix,
@@ -106,4 +129,3 @@ class PalletAuth(WebFrameworkAuth):  # A common base class for Flask and Quart
                 # Save an http 302 by calling self.login(request) instead of redirect(self.login)
                 return self.login(next_link=self._request.url, scopes=scopes)
         return wrapper
-
