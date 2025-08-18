@@ -47,8 +47,11 @@ This Identity library is a Python authentication/authorization library that:
    :hidden:
 
    django
+   django-webapi
    flask
+   flask-webapi
    quart
+   quart-webapi
    abc
    generic
 
@@ -59,4 +62,10 @@ This Identity library is a Python authentication/authorization library that:
 
     Other modules in the source code are all considered as internal helpers,
     which could change at anytime in the future, without prior notice.
+
+This library is designed to be used in either a web app or a web API.
+Understand the difference between the two scenarios,
+before you choose the right component to build your project.
+
+.. include:: app-vs-api.rst
 

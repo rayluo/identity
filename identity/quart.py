@@ -1,6 +1,7 @@
 from typing import List, Optional  # Needed in Python 3.7 & 3.8
 from quart import (
     Blueprint, Quart,
+    abort, make_response,
     redirect, render_template, request, session, url_for,
 )
 from quart_session import Session
@@ -13,10 +14,12 @@ class Auth(PalletAuth):
     _Session = Session
     _redirect = redirect
     _url_for = url_for
+    _abort = abort
+    _make_response = make_response
 
     def __init__(
         self,
-        app: Optional[Quart],
+        app: Optional[Quart] = None,
         *args,
         post_logout_view: Optional[callable] = None,
         **kwargs,
@@ -165,3 +168,17 @@ class Auth(PalletAuth):
 
         """
         return super(Auth, self).login_required(function, scopes=scopes)
+
+    def raise_http_error(self, status_code, *, headers=None, description=None):
+        """Override to use HttpError exception instead of direct response creation.
+
+        Unlike Flask's synchronous make_response and abort functions, Quart's
+        make_response is async and requires await. Since this method is called
+        from the synchronous _validate() method, we cannot await here.
+
+        Instead, we raise an HttpError exception which is caught and properly
+        converted to a Quart response in the async wrapper of PalletAuth's
+        authorization_required decorator.
+        """
+        from .web import HttpError
+        raise HttpError(status_code, headers=headers, description=description)

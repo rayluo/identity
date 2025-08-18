@@ -129,3 +129,29 @@ class PalletAuth(WebFrameworkAuth):
                 # Save an http 302 by calling self.login(request) instead of redirect(self.login)
                 return self.login(next_link=self._request.url, scopes=scopes)
         return wrapper
+
+    def authorization_required(self, *, expected_scopes, **kwargs):
+        def decorator(function):
+            if iscoroutinefunction(function):  # For Quart
+                @wraps(function)
+                async def async_wrapper(*args, **kwargs):
+                    try:
+                        context = self._validate(self._request, expected_scopes=expected_scopes)
+                    except Exception as e:
+                        # Handle HttpError for Quart - convert to response
+                        if hasattr(e, 'status_code'):
+                            response = await self.__class__._make_response(e.description, e.status_code)
+                            if e.headers:
+                                response.headers.update(e.headers)
+                            self.__class__._abort(response)
+                        raise
+                    return await function(*args, context=context, **kwargs)
+                return async_wrapper
+            else:  # For Flask
+                @wraps(function)
+                def wrapper(*args, **kwargs):
+                    context = self._validate(self._request, expected_scopes=expected_scopes)
+                    return function(*args, context=context, **kwargs)
+                return wrapper
+        return decorator
+
