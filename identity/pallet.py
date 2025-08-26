@@ -92,6 +92,9 @@ class PalletAuth(WebFrameworkAuth):
             ) if self._post_logout_view else self._request.url_root)
         )
 
+    def get_user(self):
+        return self._auth.get_user()
+        
     def login_required(  # Named after Django's login_required
         self,
         function=None,
